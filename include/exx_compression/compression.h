@@ -36,9 +36,7 @@ class compression{
 	std::vector<PointCloudT::Ptr > hulls_;
 	std::vector<PointCloudT::Ptr > rw_hulls_;
 	std::vector<pcl::ModelCoefficients::Ptr> coeffs_;
-	std::vector<pcl::PolygonMesh> meshes_;
 	std::vector<cloudMesh > cloud_mesh_;
-	pcl::PolygonMesh mesh_;
 
 public:
 	compression() : 
@@ -104,8 +102,6 @@ public:
 	std::vector<PointCloudT::Ptr > returnSuperVoxelPlanes() { return sv_planes_; }
 	std::vector<PointCloudT::Ptr > returnHulls() { return hulls_; }
 	std::vector<PointCloudT::Ptr > returnRWHulls() { return rw_hulls_; }
-	std::vector<pcl::PolygonMesh > returnMeshes() { return meshes_; }
-	pcl::PolygonMesh returnMesh() { return mesh_; }
 	std::vector<cloudMesh > returnCloudMesh() { return cloud_mesh_; }
 
 	// SAVE METHODS
@@ -114,7 +110,6 @@ public:
 	void saveSVPlanes(std::string name = "cmprs_sv_cloud"){ savePCD(sv_planes_, name); }
 	void saveHulls(std::string name = "cmprs_hulls"){ savePCD(hulls_, name); }
 	void saveRWHulls(std::string name = "cmprs_rw_hulls"){ savePCD(rw_hulls_, name); }
-	void saveMesh(std::string path="./", std::string name="cmprs_mesh"){ saveVTK(mesh_, path+name); }
 private:
 
 	PointCloudT::Ptr superVoxelClustering_s(PointCloudT::Ptr cloud, float voxel_res, float seed_res, float color_imp, float spatial_imp);
