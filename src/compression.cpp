@@ -235,8 +235,8 @@ namespace EXX{
 	}
 
 	void compression::greedyProjectionTriangulationPlanes(){
-		PointCloudT::Ptr tmp_cloud (new PointCloudT ());
 		for (size_t i = 0; i < sv_planes_.size(); i++){
+			PointCloudT::Ptr tmp_cloud (new PointCloudT ());
 			*tmp_cloud = *sv_planes_[i]+*rw_hulls_[i];
 			cloud_mesh_.push_back( compression::greedyProjectionTriangulation_s( tmp_cloud ));
 		}
