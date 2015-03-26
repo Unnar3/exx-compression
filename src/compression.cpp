@@ -85,7 +85,7 @@ namespace EXX{
 		seg.setDistanceThreshold (distance_threshold);
 
 		int i=0, nr_points = (int) cloud_->points.size ();
-		while (i < 500 && cloud_->points.size() > 0 && cloud_->points.size() > 0.05 * nr_points)
+		while (i < max_number_planes_ && cloud_->points.size() > 0 && cloud_->points.size() > 0.05 * nr_points)
 		{
 		    // Define for each plane we find
 		    ModelCoeffT::Ptr coefficients (new ModelCoeffT);
@@ -174,6 +174,12 @@ namespace EXX{
 		// TODO:
 		// check that hulls_ actually has some data.
 
+		// Check that we want to simplify the hulls
+		if (!simplify_hulls_){
+			rw_hulls_ =  hulls_;
+			return;
+		}
+
 		for (size_t i = 0; i < hulls_.size(); i++){
 			rw_hulls_.push_back( compression::reumannWitkamLineSimplification_s(hulls_.at(i), eps) );
 		}
@@ -182,7 +188,7 @@ namespace EXX{
 
 	PointCloudT::Ptr compression::reumannWitkamLineSimplification_s(PointCloudT::Ptr cloud, double eps){
 	    
-	    double distToLine;
+	    double distToLine, distBetweenPoints;
 	    int j_current, j_next, j_nextCheck, j_last;
 	    PointT current, next, last, nextCheck;
 	    PointCloudT::Ptr cloud_out (new PointCloudT ());
@@ -201,6 +207,19 @@ namespace EXX{
             next = cloud->points.at(j_next);
             last = cloud->points.at(j_last);
             nextCheck = cloud->points.at(j_nextCheck);
+
+            // Check that the point is not to far away current point.
+            distBetweenPoints = compression::distBetweenPoints(current, nextCheck);
+            if (distBetweenPoints > rw_hull_max_dist_){
+            	inliers->indices.push_back(j_next);
+            	j_current = j_nextCheck;
+            	j_next = j_current + 1;
+            	j_last = j_next;
+            	j_nextCheck = j_next + 1;
+                continue;
+            }
+
+            // Check that the point is not to far away from the line.
             distToLine = pointToLineDistance(current, next, nextCheck);
             if ( distToLine < eps ){
                 if ( j_next != j_last ){
@@ -231,6 +250,7 @@ namespace EXX{
 			*tmp_cloud += *sv_planes_[i];
 			*tmp_cloud += *rw_hulls_[i];
 		}
+		*tmp_cloud += *cloud_;
 		cloud_mesh_.push_back( compression::greedyProjectionTriangulation_s( tmp_cloud ) );
 	}
 
@@ -240,6 +260,7 @@ namespace EXX{
 			*tmp_cloud = *sv_planes_[i]+*rw_hulls_[i];
 			cloud_mesh_.push_back( compression::greedyProjectionTriangulation_s( tmp_cloud ));
 		}
+		cloud_mesh_.push_back( compression::greedyProjectionTriangulation_s( cloud_ ));
 	}
 
 	cloudMesh compression::greedyProjectionTriangulation_s(PointCloudT::Ptr cloud){
@@ -307,12 +328,21 @@ namespace EXX{
 		cross.push_back(x0x1[2]*x0x2[0] - x0x1[0]*x0x2[2]);
 		cross.push_back(x0x1[0]*x0x2[1] - x0x1[1]*x0x2[0]);
 
-		return sqrt(cross[0]*cross[0] + cross[1]*cross[1] + cross[2]*cross[2]) / sqrt(x1x2[0]*x1x2[0] + x1x2[1]*x1x2[1] + x1x2[2]*x1x2[2]);
+		return std::sqrt(cross[0]*cross[0] + cross[1]*cross[1] + cross[2]*cross[2]) / std::sqrt(x1x2[0]*x1x2[0] + x1x2[1]*x1x2[1] + x1x2[2]*x1x2[2]);
+	}
+
+	double compression::distBetweenPoints(PointT a, PointT b){
+		double x = a.x - b.x;
+		double y = a.y - b.y;
+		double z = a.z - b.z;
+
+		return std::sqrt( x*x + y*y + z*z );
 	}
 
 	void compression::triangulate(){
 		compression::voxelGridFilter();
 		compression::extractPlanesRANSAC();
+		compression::projectToPlane();
 		compression::planeToConcaveHull();
 		compression::reumannWitkamLineSimplification();
 		compression::superVoxelClustering();
@@ -322,6 +352,7 @@ namespace EXX{
 	void compression::triangulatePlanes(){
 		compression::voxelGridFilter();
 		compression::extractPlanesRANSAC();
+		compression::projectToPlane();
 		compression::planeToConcaveHull();
 		compression::reumannWitkamLineSimplification();
 		compression::superVoxelClustering();
