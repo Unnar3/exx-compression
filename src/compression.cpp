@@ -38,6 +38,7 @@ namespace EXX{
 	}
 
 	void compression::superVoxelClustering(){
+		std::cout << "Color Importance in clustering class: "<< sv_color_imp_ << std::endl;
 		compression::superVoxelClustering(sv_voxel_res_, sv_seed_res_, sv_color_imp_, sv_spatial_imp_);
 	}
 
@@ -52,7 +53,7 @@ namespace EXX{
 		}
 	}
 
-	PointCloudT::Ptr compression::superVoxelClustering_s(PointCloudT::Ptr cloud, float voxel_res, float seed_res, float color_imp, float spatial_imp){
+	PointCloudTA::Ptr compression::superVoxelClustering_s(PointCloudT::Ptr cloud, float voxel_res, float seed_res, float color_imp, float spatial_imp){
 		bool use_transform = false;
 		float voxel_resolution = voxel_res;
 		float seed_resolution = seed_res;
@@ -62,10 +63,19 @@ namespace EXX{
 		pcl::SupervoxelClustering<PointT> super (voxel_resolution, seed_resolution, use_transform);
 		super.setColorImportance (color_importance);
 		super.setSpatialImportance (spatial_importance);
+		super.setNormalImportance(0.0f);
 		super.setInputCloud (cloud);
 		std::map <uint32_t, pcl::Supervoxel<PointT>::Ptr > supervoxel_clusters;
 		super.extract (supervoxel_clusters);
-		return super.getVoxelCentroidCloud();
+
+		PointCloudTA::Ptr out (new PointCloudTA ());
+		std::map <uint32_t, pcl::Supervoxel<PointT>::Ptr >::iterator it = supervoxel_clusters.begin();
+		for ( ; it != supervoxel_clusters.end() ; ++it ){
+			out->points.push_back( it->second->centroid_ );
+		}
+		sv_planes_test_.push_back( super.getColoredCloud() );
+		// return super.getVoxelCentroidCloud();
+		return out;
 	} 
 
 	void compression::extractPlanesRANSAC()
@@ -247,7 +257,8 @@ namespace EXX{
 	void compression::greedyProjectionTriangulation(){
 		PointCloudT::Ptr tmp_cloud (new PointCloudT ());
 		for (size_t i = 0; i < sv_planes_.size(); i++){
-			*tmp_cloud += *sv_planes_[i];
+			PointCloudT::Ptr tmp2_cloud (new PointCloudT ());
+			*tmp_cloud += compression::PointRGBAtoRGB(sv_planes_[i]);
 			*tmp_cloud += *rw_hulls_[i];
 		}
 		*tmp_cloud += *cloud_;
@@ -257,7 +268,7 @@ namespace EXX{
 	void compression::greedyProjectionTriangulationPlanes(){
 		for (size_t i = 0; i < sv_planes_.size(); i++){
 			PointCloudT::Ptr tmp_cloud (new PointCloudT ());
-			*tmp_cloud = *sv_planes_[i]+*rw_hulls_[i];
+			*tmp_cloud = compression::PointRGBAtoRGB(sv_planes_[i])+*rw_hulls_[i];
 			cloud_mesh_.push_back( compression::greedyProjectionTriangulation_s( tmp_cloud ));
 		}
 		cloud_mesh_.push_back( compression::greedyProjectionTriangulation_s( cloud_ ));
@@ -287,7 +298,6 @@ namespace EXX{
 	    gp3.setMaximumAngle( gp3_max_angle_ ); // 120 degrees
 	    gp3.setNormalConsistency(false);
 
-	    std::cout << "hmm" << std::endl;
 	    tree->setInputCloud (cloud);
 	    n.setInputCloud (cloud);
 	    n.setSearchMethod (tree);
@@ -296,7 +306,6 @@ namespace EXX{
 
 	    // Concatenate the XYZ and normal fields*
 	    pcl::concatenateFields (*cloud, *normals, *cloud_with_normals);
-	    std::cout << "hmm2" << std::endl;
 	    tree2->setInputCloud (cloud_with_normals);
 
 	    // Get result
@@ -338,6 +347,12 @@ namespace EXX{
 
 		return std::sqrt( x*x + y*y + z*z );
 	}
+	
+	PointCloudT compression::PointRGBAtoRGB( PointCloudTA::Ptr cloudRGBA ){
+		PointCloudT::Ptr cloud (new PointCloudT ());
+		pcl::copyPointCloud(*cloudRGBA, *cloud);
+		return *cloud;
+	}
 
 	void compression::triangulate(){
 		compression::voxelGridFilter();
@@ -351,12 +366,19 @@ namespace EXX{
 
 	void compression::triangulatePlanes(){
 		compression::voxelGridFilter();
+		std::cout << "voxel" << std::endl;
 		compression::extractPlanesRANSAC();
+		std::cout << "ransac" << std::endl;
 		compression::projectToPlane();
+		std::cout << "project" << std::endl;
 		compression::planeToConcaveHull();
+		std::cout << "hull" << std::endl;
 		compression::reumannWitkamLineSimplification();
+		std::cout << "simple hull" << std::endl;
 		compression::superVoxelClustering();
+		std::cout << "super" << std::endl;
 		compression::greedyProjectionTriangulationPlanes();
+		std::cout << "triangulation" << std::endl;
 	}
 
 

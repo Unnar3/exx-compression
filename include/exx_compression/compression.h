@@ -2,6 +2,7 @@
 #ifndef COMPRESSION_H
 #define COMPRESSION_H
 
+#define PCL_NO_PRECOMPILE
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
 #include <pcl/ModelCoefficients.h>
@@ -9,6 +10,8 @@
 
 typedef pcl::PointXYZRGB PointT;
 typedef pcl::PointCloud<PointT> PointCloudT;
+typedef pcl::PointXYZRGBA PointTA;
+typedef pcl::PointCloud<PointTA> PointCloudTA;
 
 namespace EXX{
 
@@ -33,7 +36,8 @@ class compression{
 
 	PointCloudT::Ptr cloud_;
 	std::vector<PointCloudT::Ptr > planes_;
-	std::vector<PointCloudT::Ptr > sv_planes_;
+	std::vector<PointCloudTA::Ptr > sv_planes_;
+	std::vector<pcl::PointCloud< pcl::PointXYZRGBA>::Ptr > sv_planes_test_;
 	std::vector<PointCloudT::Ptr > hulls_;
 	std::vector<PointCloudT::Ptr > rw_hulls_;
 	std::vector<pcl::ModelCoefficients::Ptr> coeffs_;
@@ -102,20 +106,22 @@ public:
 	// RETURN METHODS
 	PointCloudT::Ptr returnCloud() { return cloud_; }
 	std::vector<PointCloudT::Ptr > returnPlanes() { return planes_; }
-	std::vector<PointCloudT::Ptr > returnSuperVoxelPlanes() { return sv_planes_; }
+	std::vector<PointCloudTA::Ptr > returnSuperVoxelPlanes() { return sv_planes_; }
 	std::vector<PointCloudT::Ptr > returnHulls() { return hulls_; }
 	std::vector<PointCloudT::Ptr > returnRWHulls() { return rw_hulls_; }
 	std::vector<cloudMesh > returnCloudMesh() { return cloud_mesh_; }
 
+	std::vector<pcl::PointCloud< pcl::PointXYZRGBA>::Ptr > returnSuperVoxelPlanesTest() { return sv_planes_test_; }
+
 	// SAVE METHODS
 	void saveCloud(std::string path="./", std::string name = "cmprs_cloud"){ savePCD(cloud_, path+name); }
 	void savePlanes(std::string name = "cmprs_planes"){ savePCD(planes_, name); }
-	void saveSVPlanes(std::string name = "cmprs_sv_cloud"){ savePCD(sv_planes_, name); }
+	// void saveSVPlanes(std::string name = "cmprs_sv_cloud"){ savePCD(sv_planes_, name); }
 	void saveHulls(std::string name = "cmprs_hulls"){ savePCD(hulls_, name); }
 	void saveRWHulls(std::string name = "cmprs_rw_hulls"){ savePCD(rw_hulls_, name); }
 private:
 
-	PointCloudT::Ptr superVoxelClustering_s(PointCloudT::Ptr cloud, float voxel_res, float seed_res, float color_imp, float spatial_imp);
+	PointCloudTA::Ptr superVoxelClustering_s(PointCloudT::Ptr cloud, float voxel_res, float seed_res, float color_imp, float spatial_imp);
 	void projectToPlane();
 	double pointToLineDistance(PointT current, PointT next, PointT nextCheck);
 	double distBetweenPoints(PointT a, PointT b);
@@ -125,6 +131,7 @@ private:
 	void savePCD(std::vector<PointCloudT::Ptr> cloud, std::string name);
 	void saveVTK(pcl::PolygonMesh mesh, std::string name);
 	cloudMesh greedyProjectionTriangulation_s(PointCloudT::Ptr cloud);
+	PointCloudT PointRGBAtoRGB( PointCloudTA::Ptr cloudRGBA );
 
 };
 
