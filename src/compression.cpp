@@ -7,7 +7,9 @@
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/segmentation/supervoxel_clustering.h>
 #include <pcl/segmentation/sac_segmentation.h>
+#include <pcl/segmentation/extract_clusters.h>
 #include <pcl/surface/concave_hull.h>
+#include <pcl/octree/octree_impl.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/io/vtk_io.h>
 
@@ -77,6 +79,37 @@ namespace EXX{
 		// return super.getVoxelCentroidCloud();
 		return out;
 	} 
+
+	void compression::euclideanClusterPlanes(){
+		// Loop through all planes
+		std::vector<PointCloudT::Ptr >::iterator ite = planes_.begin();
+		for ( ; ite != planes_.end(); ++ite){
+			// Creating the KdTree object for the search method of the extraction
+			pcl::search::KdTree<PointT>::Ptr tree (new pcl::search::KdTree<PointT>);
+			tree->setInputCloud (*ite);
+
+			std::vector<pcl::PointIndices> cluster_indices;
+			pcl::EuclideanClusterExtraction<PointT> ec;
+			ec.setClusterTolerance (ec_cluster_tolerance_); // 2cm
+			ec.setMinClusterSize (ec_min_cluster_size_);
+			// ec.setMaxClusterSize (25000);
+			ec.setSearchMethod (tree);
+			ec.setInputCloud (*ite);
+			ec.extract (cluster_indices);
+
+			int j = 0;
+			for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
+			{
+				PointCloudT::Ptr cloud_cluster (new PointCloudT);
+				for (std::vector<int>::const_iterator pit = it->indices.begin (); pit != it->indices.end (); ++pit)
+					cloud_cluster->points.push_back ((*ite)->points[*pit]); //*
+				cloud_cluster->width = cloud_cluster->points.size ();
+				cloud_cluster->height = 1;
+				cloud_cluster->is_dense = true;
+				c_planes_.push_back(cloud_cluster);
+			}
+		}
+	}
 
 	void compression::extractPlanesRANSAC()
 	{

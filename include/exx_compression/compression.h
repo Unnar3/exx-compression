@@ -1,8 +1,6 @@
-
 #ifndef COMPRESSION_H
 #define COMPRESSION_H
 
-#define PCL_NO_PRECOMPILE
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
 #include <pcl/ModelCoefficients.h>
@@ -27,6 +25,8 @@ class compression{
 	float sv_voxel_res_, sv_seed_res_, sv_color_imp_, sv_spatial_imp_;
 	// RANSAC
 	int max_ite_, min_inliers_, max_number_planes_; double dist_thresh_;
+	// EUCLIDEAN CLUSTERING
+	double ec_cluster_tolerance_; int ec_min_cluster_size_;
 	// CONCAVE HULLS
 	double hull_alpha_, rw_hull_eps_, rw_hull_max_dist_;
 	bool simplify_hulls_;
@@ -36,6 +36,7 @@ class compression{
 
 	PointCloudT::Ptr cloud_;
 	std::vector<PointCloudT::Ptr > planes_;
+	std::vector<PointCloudT::Ptr > c_planes_;
 	std::vector<PointCloudTA::Ptr > sv_planes_;
 	std::vector<pcl::PointCloud< pcl::PointXYZRGBA>::Ptr > sv_planes_test_;
 	std::vector<PointCloudT::Ptr > hulls_;
@@ -46,12 +47,27 @@ class compression{
 public:
 	compression() : 
 		v_leaf_size_(0.02f),
-		sv_voxel_res_(0.1f), sv_seed_res_(0.3f), sv_color_imp_(0.5f), sv_spatial_imp_(0.1f),
-		max_ite_(100), min_inliers_(200),max_number_planes_(100), dist_thresh_(0.04),
-		hull_alpha_(0.1), rw_hull_eps_(0.02),rw_hull_max_dist_(0.3), simplify_hulls_(true),
-		gp3_search_rad_(0.3), gp3_Mu_(3.0), gp3_max_surface_angle_(M_PI/4),
-		gp3_min_angle_(M_PI/20),  gp3_max_angle_(2*M_PI/2.5),
-		gp3_max_nearest_neighbours_(100), gp3_Ksearch_(20)
+		sv_voxel_res_(0.1f), 
+		sv_seed_res_(0.3f), 
+		sv_color_imp_(0.5f), 
+		sv_spatial_imp_(0.1f),
+		max_ite_(100), 
+		min_inliers_(200),
+		max_number_planes_(100), 
+		dist_thresh_(0.04), 
+		ec_cluster_tolerance_(0.05),
+		ec_min_cluster_size_(100),
+		hull_alpha_(0.1), 
+		rw_hull_eps_(0.02),
+		rw_hull_max_dist_(0.3), 
+		simplify_hulls_(true),
+		gp3_search_rad_(0.3), 
+		gp3_Mu_(3.0), 
+		gp3_max_surface_angle_(M_PI/4),
+		gp3_min_angle_(M_PI/20),  
+		gp3_max_angle_(2*M_PI/2.5),
+		gp3_max_nearest_neighbours_(100), 
+		gp3_Ksearch_(20)
 	{ }
 	~compression(){ };
 
@@ -71,7 +87,10 @@ public:
 	void extractPlanesRANSAC();
 	void extractPlanesRANSAC(int max_iterations, int min_inliers, double distance_threshold);
 
-	// CONCAVE HULLS (DEPENDS ON THAT PLANES HAVE BEEN IDENTIFIEDL)
+	// EUCLIDIAN CLUSTERING OF PLANES
+	void euclideanClusterPlanes();
+
+	// CONCAVE HULLS (DEPENDS ON THAT PLANES HAVE BEEN IDENTIFIED)
 	void planeToConcaveHull();
 	void planeToConcaveHull(double alpha);
 	void reumannWitkamLineSimplification();
@@ -90,6 +109,8 @@ public:
 	void setRANSACMaxIteration(int ite){ max_ite_ = ite; }
 	void setRANSACMinInliers(int inl){ min_inliers_ = inl; }
 	void setRANSACDistanceThreshold(double thresh){ dist_thresh_ = thresh; }
+	void setECClusterTolerance(double dist){ ec_cluster_tolerance_ = dist; }
+	void setECMinClusterSize(int size){ ec_min_cluster_size_ = size; }
 	void setHULLAlpha(double alpha){ hull_alpha_ = alpha; }
 	void setRWHUllEps(double eps){ rw_hull_eps_ = eps; }
 	void setRWHullMaxDist(double dist){ rw_hull_max_dist_ = dist; }
@@ -106,6 +127,7 @@ public:
 	// RETURN METHODS
 	PointCloudT::Ptr returnCloud() { return cloud_; }
 	std::vector<PointCloudT::Ptr > returnPlanes() { return planes_; }
+	std::vector<PointCloudT::Ptr > returnECPlanes() { return c_planes_; }
 	std::vector<PointCloudTA::Ptr > returnSuperVoxelPlanes() { return sv_planes_; }
 	std::vector<PointCloudT::Ptr > returnHulls() { return hulls_; }
 	std::vector<PointCloudT::Ptr > returnRWHulls() { return rw_hulls_; }
