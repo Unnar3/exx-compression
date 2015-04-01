@@ -10,8 +10,16 @@ typedef pcl::PointXYZRGB PointT;
 typedef pcl::PointCloud<PointT> PointCloudT;
 typedef pcl::PointXYZRGBA PointTA;
 typedef pcl::PointCloud<PointTA> PointCloudTA;
+typedef pcl::ModelCoefficients ModelCoeffT;
+typedef std::vector<PointCloudT::Ptr> vPointCloudT;
+typedef std::vector<PointCloudTA::Ptr> vPointCloudTA;
 
 namespace EXX{
+
+struct planesAndCoeffs{
+	std::vector<PointCloudT::Ptr> cloud;
+	std::vector<ModelCoeffT::Ptr> coeff;
+};
 
 struct cloudMesh{
 	PointCloudT::Ptr cloud;
@@ -37,8 +45,7 @@ class compression{
 	PointCloudT::Ptr cloud_;
 	std::vector<PointCloudT::Ptr > planes_;
 	std::vector<PointCloudT::Ptr > c_planes_;
-	std::vector<PointCloudTA::Ptr > sv_planes_;
-	std::vector<pcl::PointCloud< pcl::PointXYZRGBA>::Ptr > sv_planes_test_;
+	std::vector<PointCloudT::Ptr > sv_planes_;
 	std::vector<PointCloudT::Ptr > hulls_;
 	std::vector<PointCloudT::Ptr > rw_hulls_;
 	std::vector<pcl::ModelCoefficients::Ptr> coeffs_;
@@ -71,34 +78,27 @@ public:
 	{ }
 	~compression(){ };
 
-
-	void setInputCloud(PointCloudT::Ptr inputCloud);
-
 	void triangulate();
 	void triangulatePlanes();
 	
 	// Filtering Methods 
-	void voxelGridFilter();
-	void voxelGridFilter(float leaf_size);
-	void superVoxelClustering();
-	void superVoxelClustering(float voxel_res, float seed_res, float color_imp, float spatial_imp);
+	void voxelGridFilter(PointCloudT::Ptr cloud, PointCloudT::Ptr out_cloud);
+	void superVoxelClustering(vPointCloudT *cloud, vPointCloudT *out_vec);
 
 	// RANSAC METHODS
-	void extractPlanesRANSAC();
-	void extractPlanesRANSAC(int max_iterations, int min_inliers, double distance_threshold);
+	void extractPlanesRANSAC(PointCloudT::Ptr cloud, planesAndCoeffs *pac);
+	void projectToPlane(planesAndCoeffs *pac);
 
 	// EUCLIDIAN CLUSTERING OF PLANES
-	void euclideanClusterPlanes();
+	void euclideanClusterPlanes(vPointCloudT* cloud, vPointCloudT* out_vec);
 
-	// CONCAVE HULLS (DEPENDS ON THAT PLANES HAVE BEEN IDENTIFIED)
-	void planeToConcaveHull();
-	void planeToConcaveHull(double alpha);
-	void reumannWitkamLineSimplification();
-	void reumannWitkamLineSimplification(double eps);
+	// CONCAVE HULLS
+	void planeToConcaveHull(vPointCloudT *planes, vPointCloudT *hulls);
+	void reumannWitkamLineSimplification(vPointCloudT* hulls, vPointCloudT* s_hulls);
 
 	// TRIANGULATION
-	void greedyProjectionTriangulation();
-	void greedyProjectionTriangulationPlanes();
+	void greedyProjectionTriangulation(PointCloudT::Ptr nonPlanar, vPointCloudT *planes, vPointCloudT *hulls, std::vector<cloudMesh> *cm);
+	void greedyProjectionTriangulationPlanes(PointCloudT::Ptr nonPlanar, vPointCloudT *planes, vPointCloudT *hulls, std::vector<cloudMesh> *cm);
 
 	// SET METHODS
 	void setVoxelLeafSize(float leaf){ v_leaf_size_ = leaf; }
@@ -128,12 +128,10 @@ public:
 	PointCloudT::Ptr returnCloud() { return cloud_; }
 	std::vector<PointCloudT::Ptr > returnPlanes() { return planes_; }
 	std::vector<PointCloudT::Ptr > returnECPlanes() { return c_planes_; }
-	std::vector<PointCloudTA::Ptr > returnSuperVoxelPlanes() { return sv_planes_; }
+	std::vector<PointCloudT::Ptr > returnSuperVoxelPlanes() { return sv_planes_; }
 	std::vector<PointCloudT::Ptr > returnHulls() { return hulls_; }
 	std::vector<PointCloudT::Ptr > returnRWHulls() { return rw_hulls_; }
 	std::vector<cloudMesh > returnCloudMesh() { return cloud_mesh_; }
-
-	std::vector<pcl::PointCloud< pcl::PointXYZRGBA>::Ptr > returnSuperVoxelPlanesTest() { return sv_planes_test_; }
 
 	// SAVE METHODS
 	void saveCloud(std::string path="./", std::string name = "cmprs_cloud"){ savePCD(cloud_, path+name); }
@@ -143,17 +141,16 @@ public:
 	void saveRWHulls(std::string name = "cmprs_rw_hulls"){ savePCD(rw_hulls_, name); }
 private:
 
-	PointCloudTA::Ptr superVoxelClustering_s(PointCloudT::Ptr cloud, float voxel_res, float seed_res, float color_imp, float spatial_imp);
-	void projectToPlane();
+	PointCloudT::Ptr superVoxelClustering_s(PointCloudT::Ptr cloud);
 	double pointToLineDistance(PointT current, PointT next, PointT nextCheck);
 	double distBetweenPoints(PointT a, PointT b);
-	PointCloudT::Ptr planeToConcaveHull_s(PointCloudT::Ptr cloud, double alpha);
-	PointCloudT::Ptr reumannWitkamLineSimplification_s(PointCloudT::Ptr cloud, double eps);
+	PointCloudT::Ptr planeToConcaveHull_s(PointCloudT::Ptr cloud);
+	PointCloudT::Ptr reumannWitkamLineSimplification_s(PointCloudT::Ptr cloud);
 	void savePCD(PointCloudT::Ptr cloud, std::string name);
 	void savePCD(std::vector<PointCloudT::Ptr> cloud, std::string name);
 	void saveVTK(pcl::PolygonMesh mesh, std::string name);
 	cloudMesh greedyProjectionTriangulation_s(PointCloudT::Ptr cloud);
-	PointCloudT PointRGBAtoRGB( PointCloudTA::Ptr cloudRGBA );
+	PointCloudT::Ptr PointRGBAtoRGB( PointCloudTA::Ptr cloudRGBA );
 
 };
 

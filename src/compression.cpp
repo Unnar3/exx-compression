@@ -13,58 +13,29 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/io/vtk_io.h>
 
-typedef pcl::PointXYZRGB PointT;
-typedef pcl::PointNormal PointNT;
-typedef pcl::PointCloud<PointT> PointCloudT;
-typedef pcl::PointCloud<PointNT> PointNCloudT;
-typedef pcl::ModelCoefficients ModelCoeffT;
-
 namespace EXX{
 
-	void compression::setInputCloud(PointCloudT::Ptr inputCloud){
-		cloud_  = PointCloudT::Ptr (new PointCloudT ());
-		*cloud_ = *inputCloud;
-	}
-
-	void compression::voxelGridFilter(){
-		compression::voxelGridFilter(v_leaf_size_);
-	}
-
-	void compression::voxelGridFilter(float voxel_leaf_size){
-		PointCloudT::Ptr cloud_voxel (new PointCloudT ());
+	void compression::voxelGridFilter(PointCloudT::Ptr cloud, PointCloudT::Ptr out_cloud){
 		pcl::VoxelGrid<PointT> sor;
-		sor.setInputCloud (cloud_);
-		sor.setLeafSize ((float)voxel_leaf_size, (float)voxel_leaf_size, (float)voxel_leaf_size);
-		sor.filter (*cloud_voxel);
-		cloud_.swap(cloud_voxel);
+		sor.setInputCloud (cloud);
+		sor.setLeafSize (v_leaf_size_, v_leaf_size_, v_leaf_size_);
+		sor.filter (*out_cloud);
 	}
 
-	void compression::superVoxelClustering(){
-		std::cout << "Color Importance in clustering class: "<< sv_color_imp_ << std::endl;
-		compression::superVoxelClustering(sv_voxel_res_, sv_seed_res_, sv_color_imp_, sv_spatial_imp_);
-	}
-
-	void compression::superVoxelClustering(float voxel_res, float seed_res, float color_imp, float spatial_imp){
-		
-		// TODO:
-		// Include some check that planes_ actually includes some data.
-
-		for (std::vector<PointCloudT::Ptr>::iterator it = planes_.begin(); it != planes_.end(); ++it)
+	void compression::superVoxelClustering(vPointCloudT *cloud, vPointCloudT *out_vec){
+		std::vector<PointCloudTA::Ptr> out_cloud;
+		std::vector<PointCloudT::Ptr>::iterator it = cloud->begin();
+		for (; it != cloud->end(); ++it)
 		{
-			sv_planes_.push_back(  compression::superVoxelClustering_s(*it, voxel_res, seed_res, color_imp, spatial_imp) );
+			(*out_vec).push_back(  compression::superVoxelClustering_s(*it) );
 		}
 	}
 
-	PointCloudTA::Ptr compression::superVoxelClustering_s(PointCloudT::Ptr cloud, float voxel_res, float seed_res, float color_imp, float spatial_imp){
-		bool use_transform = false;
-		float voxel_resolution = voxel_res;
-		float seed_resolution = seed_res;
-		float color_importance = color_imp;
-		float spatial_importance = spatial_imp;
+	PointCloudT::Ptr compression::superVoxelClustering_s(PointCloudT::Ptr cloud){
 
-		pcl::SupervoxelClustering<PointT> super (voxel_resolution, seed_resolution, use_transform);
-		super.setColorImportance (color_importance);
-		super.setSpatialImportance (spatial_importance);
+		pcl::SupervoxelClustering<PointT> super (sv_voxel_res_, sv_seed_res_, false);
+		super.setColorImportance (sv_color_imp_);
+		super.setSpatialImportance (sv_spatial_imp_);
 		super.setNormalImportance(0.0f);
 		super.setInputCloud (cloud);
 		std::map <uint32_t, pcl::Supervoxel<PointT>::Ptr > supervoxel_clusters;
@@ -75,15 +46,13 @@ namespace EXX{
 		for ( ; it != supervoxel_clusters.end() ; ++it ){
 			out->points.push_back( it->second->centroid_ );
 		}
-		sv_planes_test_.push_back( super.getColoredCloud() );
-		// return super.getVoxelCentroidCloud();
-		return out;
+		return compression::PointRGBAtoRGB(out);
 	} 
 
-	void compression::euclideanClusterPlanes(){
+	void compression::euclideanClusterPlanes(vPointCloudT* cloud, vPointCloudT* out_vec){
 		// Loop through all planes
-		std::vector<PointCloudT::Ptr >::iterator ite = planes_.begin();
-		for ( ; ite != planes_.end(); ++ite){
+		vPointCloudT::iterator ite = cloud->begin();
+		for ( ; ite != cloud->end(); ++ite){
 			// Creating the KdTree object for the search method of the extraction
 			pcl::search::KdTree<PointT>::Ptr tree (new pcl::search::KdTree<PointT>);
 			tree->setInputCloud (*ite);
@@ -106,17 +75,12 @@ namespace EXX{
 				cloud_cluster->width = cloud_cluster->points.size ();
 				cloud_cluster->height = 1;
 				cloud_cluster->is_dense = true;
-				c_planes_.push_back(cloud_cluster);
+				(*out_vec).push_back(cloud_cluster);
 			}
 		}
 	}
 
-	void compression::extractPlanesRANSAC()
-	{
-		compression::extractPlanesRANSAC(max_ite_, min_inliers_, dist_thresh_);
-	}
-
-	void compression::extractPlanesRANSAC(int max_iterations, int min_inliers, double distance_threshold)
+	void compression::extractPlanesRANSAC(PointCloudT::Ptr cloud, planesAndCoeffs *pac)
 	{
 		pcl::SACSegmentation<PointT> seg;
 		pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
@@ -124,32 +88,32 @@ namespace EXX{
 		seg.setOptimizeCoefficients (true);
 		seg.setModelType (pcl::SACMODEL_PLANE);
 		seg.setMethodType (pcl::SAC_RANSAC);
-		seg.setMaxIterations (max_iterations);
-		seg.setDistanceThreshold (distance_threshold);
+		seg.setMaxIterations (max_ite_);
+		seg.setDistanceThreshold (dist_thresh_);
 
-		int i=0, nr_points = (int) cloud_->points.size ();
-		while (i < max_number_planes_ && cloud_->points.size() > 0 && cloud_->points.size() > 0.05 * nr_points)
+		int i=0, nr_points = cloud->points.size ();
+		while (i < max_number_planes_ && cloud->points.size() > 0 && cloud->points.size() > 0.05 * nr_points)
 		{
 		    // Define for each plane we find
 		    ModelCoeffT::Ptr coefficients (new ModelCoeffT);
 		    PointCloudT::Ptr cloud_plane (new PointCloudT ());
 
 		    // Segment the largest planar component from the remaining cloud
-		    seg.setInputCloud (cloud_);
+		    seg.setInputCloud (cloud);
 		    seg.segment (*inliers, *coefficients);
 		    if (inliers->indices.size () == 0)
 		    {
 		        std::cout << "Could not estimate a planar model for the given dataset." << std::endl;
 		        break;
 		    }
-		    if(inliers->indices.size() < min_inliers){
+		    if(inliers->indices.size() < min_inliers_){
 		        i++;
 		        continue;
 		    }
 
 		    // Extract the planar inliers from the input cloud
 		    pcl::ExtractIndices<PointT> extract;
-		    extract.setInputCloud (cloud_);
+		    extract.setInputCloud (cloud);
 		    extract.setIndices (inliers);
 		    extract.setNegative (false);
 
@@ -159,77 +123,58 @@ namespace EXX{
 		    // Remove the planar inliers, extract the rest
 		    extract.setNegative (true);
 		    extract.filter (*cloud_f);
-		    cloud_.swap (cloud_f);
+		    cloud.swap (cloud_f);
 
-		    coeffs_.push_back(coefficients);
-		    planes_.push_back(cloud_plane);
+		    pac->coeff.push_back(coefficients);
+		    pac->cloud.push_back(cloud_plane);
 		    i++;
 		}
 	}
 
-	void compression::projectToPlane(){
-
-		// TODO:
-		// Check that planes_ and coeffs_ actually has any data
+	void compression::projectToPlane(planesAndCoeffs *pac){
 
 		// Create the projection object
 		pcl::ProjectInliers<PointT> proj;
 		proj.setModelType (pcl::SACMODEL_PLANE);
 
-		for (int i = 0; i < planes_.size(); i++){
-		    proj.setInputCloud ( planes_[i] );
-		    proj.setModelCoefficients ( coeffs_[i]);
-		    proj.filter ( *planes_[i] );
+		for (int i = 0; i < pac->cloud.size(); i++){
+		    proj.setInputCloud ( pac->cloud.at(i) );
+		    proj.setModelCoefficients ( pac->coeff.at(i) );
+		    proj.filter ( *(pac->cloud.at(i)) );
 		}
 	}
 
-	void compression::planeToConcaveHull(){
-		compression::planeToConcaveHull(hull_alpha_);
-	}
+	void compression::planeToConcaveHull(vPointCloudT *planes, vPointCloudT *hulls){
 
-	void compression::planeToConcaveHull(double alpha ){
-		// TODO:
-		// Check that planes_ actually includes some planes
-
-		for (size_t i = 0; i < planes_.size(); i++)
+		vPointCloudT::iterator it = planes->begin();
+		for ( ; it < planes->end(); ++it)
 		{
-			hulls_.push_back(compression::planeToConcaveHull_s(planes_.at(i), alpha));
+			(*hulls).push_back( compression::planeToConcaveHull_s(*it) );
 		}
 	}
 
-	PointCloudT::Ptr compression::planeToConcaveHull_s(PointCloudT::Ptr cloud, double alpha){
+	PointCloudT::Ptr compression::planeToConcaveHull_s(PointCloudT::Ptr cloud){
 		
 		pcl::ConcaveHull<PointT> chull;
 		PointCloudT::Ptr cloud_hull (new PointCloudT ());
 		chull.setInputCloud ( cloud );
-        chull.setAlpha ( alpha );
+        chull.setAlpha ( hull_alpha_ );
         chull.setKeepInformation ( true );
         chull.reconstruct (*cloud_hull);
 
 		return cloud_hull;
 	}
 
-	void compression::reumannWitkamLineSimplification(){
-		compression::reumannWitkamLineSimplification(rw_hull_eps_);
-	}
+	void compression::reumannWitkamLineSimplification(vPointCloudT* hulls, vPointCloudT* s_hulls){
 
-	void compression::reumannWitkamLineSimplification(double eps){
-		// TODO:
-		// check that hulls_ actually has some data.
-
-		// Check that we want to simplify the hulls
-		if (!simplify_hulls_){
-			rw_hulls_ =  hulls_;
-			return;
-		}
-
-		for (size_t i = 0; i < hulls_.size(); i++){
-			rw_hulls_.push_back( compression::reumannWitkamLineSimplification_s(hulls_.at(i), eps) );
+		vPointCloudT::iterator it = hulls->begin();
+		for ( ; it < hulls->end(); ++it){
+			(*s_hulls).push_back( compression::reumannWitkamLineSimplification_s(*it) );
 		}
 
 	}
 
-	PointCloudT::Ptr compression::reumannWitkamLineSimplification_s(PointCloudT::Ptr cloud, double eps){
+	PointCloudT::Ptr compression::reumannWitkamLineSimplification_s(PointCloudT::Ptr cloud){
 	    
 	    double distToLine, distBetweenPoints;
 	    int j_current, j_next, j_nextCheck, j_last;
@@ -264,7 +209,7 @@ namespace EXX{
 
             // Check that the point is not to far away from the line.
             distToLine = pointToLineDistance(current, next, nextCheck);
-            if ( distToLine < eps ){
+            if ( distToLine < rw_hull_eps_ ){
                 if ( j_next != j_last ){
                     inliers->indices.push_back(j_last);
                 }
@@ -287,24 +232,23 @@ namespace EXX{
         return cloud_out;
 	}
 
-	void compression::greedyProjectionTriangulation(){
+	void compression::greedyProjectionTriangulation(PointCloudT::Ptr nonPlanar, vPointCloudT *planes, vPointCloudT *hulls, std::vector<cloudMesh> *cm){
 		PointCloudT::Ptr tmp_cloud (new PointCloudT ());
 		for (size_t i = 0; i < sv_planes_.size(); i++){
-			PointCloudT::Ptr tmp2_cloud (new PointCloudT ());
-			*tmp_cloud += compression::PointRGBAtoRGB(sv_planes_[i]);
-			*tmp_cloud += *rw_hulls_[i];
+			*tmp_cloud += *planes->at(i);
+			*tmp_cloud += *hulls->at(i);
 		}
-		*tmp_cloud += *cloud_;
-		cloud_mesh_.push_back( compression::greedyProjectionTriangulation_s( tmp_cloud ) );
+		*tmp_cloud += *nonPlanar;
+		(*cm).push_back( compression::greedyProjectionTriangulation_s( tmp_cloud ) );
 	}
 
-	void compression::greedyProjectionTriangulationPlanes(){
-		for (size_t i = 0; i < sv_planes_.size(); i++){
-			PointCloudT::Ptr tmp_cloud (new PointCloudT ());
-			*tmp_cloud = compression::PointRGBAtoRGB(sv_planes_[i])+*rw_hulls_[i];
-			cloud_mesh_.push_back( compression::greedyProjectionTriangulation_s( tmp_cloud ));
+	void compression::greedyProjectionTriangulationPlanes(PointCloudT::Ptr nonPlanar, vPointCloudT *planes, vPointCloudT *hulls, std::vector<cloudMesh> *cm){
+		PointCloudT::Ptr tmp_cloud (new PointCloudT ());
+		for (size_t i = 0; i < planes->size(); ++i){
+			*tmp_cloud = *planes->at(i)+*hulls->at(i);
+			(*cm).push_back( compression::greedyProjectionTriangulation_s( tmp_cloud ));
 		}
-		cloud_mesh_.push_back( compression::greedyProjectionTriangulation_s( cloud_ ));
+		(*cm).push_back( compression::greedyProjectionTriangulation_s( nonPlanar ));
 	}
 
 	cloudMesh compression::greedyProjectionTriangulation_s(PointCloudT::Ptr cloud){
@@ -381,37 +325,37 @@ namespace EXX{
 		return std::sqrt( x*x + y*y + z*z );
 	}
 	
-	PointCloudT compression::PointRGBAtoRGB( PointCloudTA::Ptr cloudRGBA ){
+	PointCloudT::Ptr compression::PointRGBAtoRGB( PointCloudTA::Ptr cloudRGBA ){
 		PointCloudT::Ptr cloud (new PointCloudT ());
 		pcl::copyPointCloud(*cloudRGBA, *cloud);
-		return *cloud;
+		return cloud;
 	}
 
 	void compression::triangulate(){
-		compression::voxelGridFilter();
-		compression::extractPlanesRANSAC();
-		compression::projectToPlane();
-		compression::planeToConcaveHull();
-		compression::reumannWitkamLineSimplification();
-		compression::superVoxelClustering();
-		compression::greedyProjectionTriangulation();
+		// compression::voxelGridFilter();
+		// compression::extractPlanesRANSAC();
+		// compression::projectToPlane();
+		// compression::planeToConcaveHull();
+		// compression::reumannWitkamLineSimplification();
+		// compression::superVoxelClustering();
+		// compression::greedyProjectionTriangulation();
 	}
 
 	void compression::triangulatePlanes(){
-		compression::voxelGridFilter();
-		std::cout << "voxel" << std::endl;
-		compression::extractPlanesRANSAC();
-		std::cout << "ransac" << std::endl;
-		compression::projectToPlane();
-		std::cout << "project" << std::endl;
-		compression::planeToConcaveHull();
-		std::cout << "hull" << std::endl;
-		compression::reumannWitkamLineSimplification();
-		std::cout << "simple hull" << std::endl;
-		compression::superVoxelClustering();
-		std::cout << "super" << std::endl;
-		compression::greedyProjectionTriangulationPlanes();
-		std::cout << "triangulation" << std::endl;
+		// compression::voxelGridFilter();
+		// std::cout << "voxel" << std::endl;
+		// compression::extractPlanesRANSAC();
+		// std::cout << "ransac" << std::endl;
+		// compression::projectToPlane();
+		// std::cout << "project" << std::endl;
+		// compression::planeToConcaveHull();
+		// std::cout << "hull" << std::endl;
+		// compression::reumannWitkamLineSimplification();
+		// std::cout << "simple hull" << std::endl;
+		// compression::superVoxelClustering();
+		// std::cout << "super" << std::endl;
+		// compression::greedyProjectionTriangulationPlanes();
+		// std::cout << "triangulation" << std::endl;
 	}
 
 
