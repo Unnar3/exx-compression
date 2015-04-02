@@ -2,7 +2,7 @@
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/filters/project_inliers.h>
-#include <pcl/features/normal_3d.h>
+#include <pcl/features/normal_3d_omp.h>
 #include <pcl/kdtree/kdtree.h>
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/segmentation/supervoxel_clustering.h>
@@ -82,14 +82,28 @@ namespace EXX{
 
 	void compression::extractPlanesRANSAC(PointCloudT::Ptr cloud, planesAndCoeffs *pac)
 	{
-		pcl::SACSegmentation<PointT> seg;
+		pcl::SACSegmentationFromNormals<PointT, pcl::Normal> seg;
+		pcl::NormalEstimationOMP<PointT, pcl::Normal> ne;
+		pcl::search::KdTree<PointT>::Ptr tree (new pcl::search::KdTree<PointT> ());
 		pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
 		PointCloudT::Ptr cloud_f (new PointCloudT ());
+		
+		pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
+		pcl::PointCloud<pcl::Normal>::Ptr cloud_n (new pcl::PointCloud<pcl::Normal>);
+		
 		seg.setOptimizeCoefficients (true);
-		seg.setModelType (pcl::SACMODEL_PLANE);
+		seg.setModelType (pcl::SACMODEL_NORMAL_PLANE);
 		seg.setMethodType (pcl::SAC_RANSAC);
 		seg.setMaxIterations (max_ite_);
 		seg.setDistanceThreshold (dist_thresh_);
+		seg.setEpsAngle (2*M_PI);
+		seg.setNormalDistanceWeight (0.1);
+
+		// Estimate point normals
+		ne.setSearchMethod (tree);
+		ne.setInputCloud (cloud);
+		ne.setKSearch (10);
+		ne.compute (*cloud_normals);
 
 		int i=0, nr_points = cloud->points.size ();
 		while (i < max_number_planes_ && cloud->points.size() > 0 && cloud->points.size() > 0.05 * nr_points)
@@ -100,7 +114,9 @@ namespace EXX{
 
 		    // Segment the largest planar component from the remaining cloud
 		    seg.setInputCloud (cloud);
+		    seg.setInputNormals(cloud_normals);
 		    seg.segment (*inliers, *coefficients);
+		    
 		    if (inliers->indices.size () == 0)
 		    {
 		        std::cout << "Could not estimate a planar model for the given dataset." << std::endl;
@@ -108,7 +124,7 @@ namespace EXX{
 		    }
 		    if(inliers->indices.size() < min_inliers_){
 		        i++;
-		        continue;
+		        break;
 		    }
 
 		    // Extract the planar inliers from the input cloud
@@ -116,14 +132,19 @@ namespace EXX{
 		    extract.setInputCloud (cloud);
 		    extract.setIndices (inliers);
 		    extract.setNegative (false);
-
-		    // Get the points associated with the planar surface
 		    extract.filter (*cloud_plane);
 
 		    // Remove the planar inliers, extract the rest
 		    extract.setNegative (true);
 		    extract.filter (*cloud_f);
 		    cloud.swap (cloud_f);
+
+		    pcl::ExtractIndices<pcl::Normal> extractN;
+		    extractN.setInputCloud(cloud_normals);
+		    extractN.setIndices (inliers);
+		    extractN.setNegative (true);
+		    extractN.filter(*cloud_n);
+		    cloud_normals.swap(cloud_n);
 
 		    pac->coeff.push_back(coefficients);
 		    pac->cloud.push_back(cloud_plane);
@@ -243,8 +264,8 @@ namespace EXX{
 	}
 
 	void compression::greedyProjectionTriangulationPlanes(PointCloudT::Ptr nonPlanar, vPointCloudT *planes, vPointCloudT *hulls, std::vector<cloudMesh> *cm){
-		PointCloudT::Ptr tmp_cloud (new PointCloudT ());
 		for (size_t i = 0; i < planes->size(); ++i){
+			PointCloudT::Ptr tmp_cloud (new PointCloudT ());
 			*tmp_cloud = *planes->at(i)+*hulls->at(i);
 			(*cm).push_back( compression::greedyProjectionTriangulation_s( tmp_cloud ));
 		}
