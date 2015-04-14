@@ -4,7 +4,7 @@
 namespace EXX{
 
 
-    void planeFeatures::calculateFeatures(vPointCloudT planes, vPointCloudT hulls, std::vector<Eigen::Vector4d> normal, std::vector<planeDescriptor> *vPlaneDescriptor){
+    void planeFeatures::calculateFeatures(vPointCloudT planes, vPointCloudT hulls, std::vector<Eigen::Vector4d> normal, std::vector<int> normalInd, std::vector<planeDescriptor> *vPlaneDescriptor){
         // Check to see if they are the same size
         if ( planes.size() != hulls.size() ){
             // TODO: break in some way.
@@ -37,10 +37,10 @@ namespace EXX{
             pDescriptor.hullArea = double( pcl::calculatePolygonArea(*hulls[i]) );
             pDescriptor.hullBoundingBoxRatio = pDescriptor.hullArea / pDescriptor.boundingBoxArea;
             pDescriptor.widthLengthRatio = wlRatio;
-            pDescriptor.normal = normal.at(i);
+            pDescriptor.normal = normal.at(     normalInd.at(i) );
             vPlaneDescriptor->push_back(pDescriptor);
+            printDescriptor(pDescriptor);
         }
-        std::cout << "working 1" << std::endl;
     }
 
     void planeFeatures::matchSimilarFeatures(std::vector<planeDescriptor> descriptor, std::vector<std::set<int> > *sets){
@@ -61,12 +61,12 @@ namespace EXX{
                 eDist = 0;
                 // Check distance 
                 vDescriptor(0) = ( std::log( j.boundingBoxArea ) - std::log( i.boundingBoxArea ));
-                vDescriptor(1) = ( std::log( j.hullArea ) - std::log( i.hullArea ));
-                vDescriptor(2) = ( std::log( j.hullBoundingBoxRatio ) - std::log( i.hullBoundingBoxRatio ));
+                vDescriptor(1) = 0; //( std::log( j.hullArea ) - std::log( i.hullArea ));
+                vDescriptor(2) = 0; //( std::log( j.hullBoundingBoxRatio ) - std::log( i.hullBoundingBoxRatio ));
                 vDescriptor(3) = ( std::log( j.widthLengthRatio ) - std::log( i.widthLengthRatio ));
-                vDescriptor(4) = planeFeatures::angleBetweenVectors( j.normal, i.normal );
+                vDescriptor(4) = 2 * std::log( planeFeatures::angleBetweenVectors( j.normal, i.normal ));
                 norm = vDescriptor.norm();
-                std::cout << "jd: " << jd << "id: " << id << std::endl;
+                // std::cout << "jd: " << jd << " id: " << id << " hull: " << std::pow(vDescriptor(2),2) << std::endl;
                 mDescriptor(jd,id) = norm;
                 // planeFeatures::getValueBetweenTwoFixedColors(norm, &red, &green, &blue);
                 id++;
@@ -103,23 +103,27 @@ namespace EXX{
     double planeFeatures::angleBetweenVectors(Eigen::Vector4d a, Eigen::Vector4d b){
         if (a == b) { return 1; }
         
-        Eigen::Vector4d c(1,1,0,0);
+        Eigen::Vector3d an(a(0),a(1),a(2));
+        Eigen::Vector3d bn(b(0),b(1),b(2));
+        Eigen::Vector3d cn(0,0,1);
 
         // Norm the vectors before calculation.
-        a = a / a.norm();
-        b = b / b.norm();
-        c = c / c.norm();
+        an = an / an.norm();
+        bn = bn / bn.norm();
+        cn = cn / cn.norm();
 
-        double ang1 = std::acos( a.dot(c) ); 
-        double ang2 = std::acos( b.dot(c) ); 
-        double ang = std::acos( a.dot(b) ); 
-        std::cout << "angle1: " << ang1/(2*M_PI)*360 << "  ";
-        std::cout << "angle2: " << ang2/(2*M_PI)*360 << std::endl;
+        double ang1 = std::abs( std::acos( an.dot(cn)) - M_PI/2 ) / (M_PI/2); 
+        double ang2 = std::abs( std::acos( bn.dot(cn)) - M_PI/2 ) / (M_PI/2); 
 
-        ang1 = std::abs( (ang1 - M_PI/2) / (M_PI/2) );
-        ang2 = std::abs( (ang2 - M_PI/2) / (M_PI/2) );
+        double ret = std::abs( ang1 - ang2);
 
-        return std::log( ang1 ) - std::log( ang2 );
+        std::cout << "angle1: " << ang1*90 << "  ";
+        std::cout << "angle2: " << ang2*90 << "  ";
+        std::cout << "return: " << 2* std::log(1 - ret) << "  ";
+        std::cout << "an: " << an.transpose() << "  ";
+        std::cout << "bn: " << bn.transpose() << std::endl;
+
+        return 1 - ret;
 
         // // Shift it around to return 1 for 0 degrees and 0 for 45 degrees.
         // if ( std::isnan(ang) ){
@@ -167,5 +171,17 @@ namespace EXX{
         }
     }
 
+
+    void planeFeatures::printDescriptor(planeDescriptor descr){
+        std::cout << "Descriptor" << std::endl;
+        std::cout << " " << std::endl;
+        std::cout << "Bounding Box Area:\t" << descr.boundingBoxArea << std::endl;
+        std::cout << "Hull Area:        \t" << descr.hullArea << std::endl;
+        std::cout << "Hull Bounding box Ratio:\t" << descr.hullBoundingBoxRatio << std::endl;
+        std::cout << "Width Length Ratio:\t" << descr.widthLengthRatio << std::endl;
+        std::cout << "Normal:           \t" << descr.normal.transpose() << std::endl;
+        std::cout << " " << std::endl;
+
+    }
 
 }

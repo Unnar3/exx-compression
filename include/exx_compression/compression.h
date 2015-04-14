@@ -90,7 +90,7 @@ public:
 	void projectToPlane(planesAndCoeffs *pac);
 
 	// EUCLIDIAN CLUSTERING OF PLANES
-	void euclideanClusterPlanes(vPointCloudT* cloud, vPointCloudT* out_vec);
+	void euclideanClusterPlanes(vPointCloudT* cloud, vPointCloudT* out_vec, std::vector<int> *normalIndex);
 
 	// CONCAVE HULLS
 	void planeToConcaveHull(vPointCloudT *planes, vPointCloudT *hulls);

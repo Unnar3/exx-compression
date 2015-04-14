@@ -38,7 +38,7 @@ public:
     ~planeFeatures(){};
 
     // Calculate features for each plane in planes.
-    static void calculateFeatures(vPointCloudT planes, vPointCloudT hulls, std::vector<Eigen::Vector4d> normal, std::vector<planeDescriptor> *vPlaneDescriptor);
+    static void calculateFeatures(vPointCloudT planes, vPointCloudT hulls, std::vector<Eigen::Vector4d> normal, std::vector<int> normalInd, std::vector<planeDescriptor> *vPlaneDescriptor);
     static void matchSimilarFeatures(std::vector<planeDescriptor> descriptor, std::vector<std::set<int> > *sets);
 
 private:
@@ -53,6 +53,9 @@ private:
     // Takes in min and max points for a bounding box and returns the biggest area
     // and the ratio of length and with for the area.
     static void getBiggestCubeArea(PointT minPoint, PointT maxPoint, double *area, double *WLRatio);
+
+    // Prints the planeDescriptor in a good way.
+    static void printDescriptor(planeDescriptor descr);
 
 };
 

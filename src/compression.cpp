@@ -49,8 +49,9 @@ namespace EXX{
 		return compression::PointRGBAtoRGB(out);
 	} 
 
-	void compression::euclideanClusterPlanes(vPointCloudT* cloud, vPointCloudT* out_vec){
+	void compression::euclideanClusterPlanes(vPointCloudT* cloud, vPointCloudT* out_vec, std::vector<int> *normalIndex){
 		// Loop through all planes
+		int ind = 0;
 		vPointCloudT::iterator ite = cloud->begin();
 		for ( ; ite != cloud->end(); ++ite){
 			// Creating the KdTree object for the search method of the extraction
@@ -76,7 +77,9 @@ namespace EXX{
 				cloud_cluster->height = 1;
 				cloud_cluster->is_dense = true;
 				(*out_vec).push_back(cloud_cluster);
+				normalIndex->push_back(ind);
 			}
+			ind++;
 		}
 	}
 
