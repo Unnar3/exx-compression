@@ -331,7 +331,7 @@
 			"file": "src/plane_features.cpp",
 			"settings":
 			{
-				"buffer_size": 6536,
+				"buffer_size": 6597,
 				"line_ending": "Unix"
 			}
 		},
@@ -865,15 +865,15 @@
 					"semi_transient": false,
 					"settings":
 					{
-						"buffer_size": 6536,
+						"buffer_size": 6597,
 						"regions":
 						{
 						},
 						"selection":
 						[
 							[
-								2373,
-								2373
+								4717,
+								4717
 							]
 						],
 						"settings":
@@ -942,7 +942,7 @@
 							"translate_tabs_to_spaces": true
 						},
 						"translation.x": 19.0,
-						"translation.y": 703.0,
+						"translation.y": 1900.0,
 						"zoom_level": 1.0
 					},
 					"stack_index": 0,
@@ -1284,7 +1284,7 @@
 		[
 			[
 				"",
-				"~/catkin_ws/src/exx_wall_extraction/exx.sublime-project"
+				"~/catkin_ws/src/strands_utils/strands.sublime-project"
 			]
 		],
 		"width": 380.0
