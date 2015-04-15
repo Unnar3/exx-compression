@@ -4,6 +4,42 @@
 		"selected_items":
 		[
 			[
+				"mass",
+				"massCenter"
+			],
+			[
+				"feat",
+				"feature_extractor"
+			],
+			[
+				"view",
+				"viewerIsSet"
+			],
+			[
+				"vi",
+				"viewerIsSet"
+			],
+			[
+				"floor",
+				"floorAngle"
+			],
+			[
+				"flo",
+				"floorAngle"
+			],
+			[
+				"wall",
+				"walls"
+			],
+			[
+				"no",
+				"Normal"
+			],
+			[
+				"pla",
+				"planeFeatures::angleToFloor"
+			],
+			[
 				"plane",
 				"planeFeatures"
 			],
@@ -85,10 +121,6 @@
 			],
 			[
 				"planes",
-				"planesAndCoeffs"
-			],
-			[
-				"pla",
 				"planesAndCoeffs"
 			],
 			[
@@ -363,7 +395,7 @@
 			"file": "src/plane_features.cpp",
 			"settings":
 			{
-				"buffer_size": 7514,
+				"buffer_size": 9469,
 				"line_ending": "Unix"
 			}
 		},
@@ -371,7 +403,7 @@
 			"file": "include/plane_features/plane_features.h",
 			"settings":
 			{
-				"buffer_size": 2090,
+				"buffer_size": 2423,
 				"line_ending": "Unix"
 			}
 		},
@@ -585,6 +617,14 @@
 		"case_sensitive": false,
 		"find_history":
 		[
+			"moment",
+			"i",
+			"j",
+			"j.hullArea",
+			"j.",
+			"cout",
+			"AABB",
+			"cout",
 			"planeDescriptor",
 			"Norm",
 			"square",
@@ -899,15 +939,15 @@
 					"semi_transient": false,
 					"settings":
 					{
-						"buffer_size": 7514,
+						"buffer_size": 9469,
 						"regions":
 						{
 						},
 						"selection":
 						[
 							[
-								3492,
-								3492
+								5848,
+								5848
 							]
 						],
 						"settings":
@@ -975,8 +1015,8 @@
 							"tab_size": 4,
 							"translate_tabs_to_spaces": true
 						},
-						"translation.x": 0.0,
-						"translation.y": 798.0,
+						"translation.x": 9.0,
+						"translation.y": 1824.0,
 						"zoom_level": 1.0
 					},
 					"stack_index": 0,
@@ -988,15 +1028,15 @@
 					"semi_transient": false,
 					"settings":
 					{
-						"buffer_size": 2090,
+						"buffer_size": 2423,
 						"regions":
 						{
 						},
 						"selection":
 						[
 							[
-								2083,
-								2083
+								697,
+								697
 							]
 						],
 						"settings":
@@ -1065,7 +1105,7 @@
 							"translate_tabs_to_spaces": true
 						},
 						"translation.x": 0.0,
-						"translation.y": 298.0,
+						"translation.y": 57.0,
 						"zoom_level": 1.0
 					},
 					"stack_index": 1,

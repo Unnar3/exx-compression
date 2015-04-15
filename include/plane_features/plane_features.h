@@ -5,6 +5,7 @@
 #include <pcl/point_cloud.h>
 #include <pcl/ModelCoefficients.h>
 #include <pcl/surface/gp3.h>
+#include <pcl/visualization/cloud_viewer.h>
 
 #include <moment_of_inertia/moment_of_inertia_estimation.h>
 #include <Eigen/Dense>
@@ -22,7 +23,7 @@ typedef std::vector<PointCloudTA::Ptr> vPointCloudTA;
 namespace EXX{
 
 struct planeDescriptor{
-    std::vector<float> momentOfInertia;
+    Eigen::Vector3f massCenter;;
     double boundingBoxArea;
     double hullArea;
     double hullBoundingBoxRatio;
@@ -32,19 +33,25 @@ struct planeDescriptor{
 };
 
 class planeFeatures{
+    boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer;
+    bool viewerIsSet;
 
 public:
-    planeFeatures(){};
+    planeFeatures() : viewerIsSet(false) {};
     ~planeFeatures(){};
 
     // Calculate features for each plane in planes.
-    static void calculateFeatures(vPointCloudT planes, vPointCloudT hulls, std::vector<Eigen::Vector4d> normal, std::vector<int> normalInd, std::vector<planeDescriptor> *vPlaneDescriptor);
-    static void matchSimilarFeatures(std::vector<planeDescriptor> descriptor, std::vector<std::set<int> > *sets);
-
+    void calculateFeatures(vPointCloudT planes, vPointCloudT hulls, std::vector<Eigen::Vector4d> normal, std::vector<int> normalInd, std::vector<planeDescriptor> *vPlaneDescriptor);
+    void matchSimilarFeatures(std::vector<planeDescriptor> descriptor, std::vector<std::set<int> > *sets);
+    void setViewer(boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer);
+    
 private:
 	// Takes in two vectors, returns angle between them in range 0 to 1  
     // where 1 means no difference, pi/2 is considered maximum angle and pi as 0.
     static double angleBetweenVectors(Eigen::Vector4d a, Eigen::Vector4d b);
+
+    // Takes in plane, returns angle between vector and floor  
+    static double angleToFloor(Eigen::Vector4d a);
 
     // Returns RGB value from red to green depending on value, low value results in blue,
     // high value results in red.
