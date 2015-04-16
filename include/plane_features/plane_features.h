@@ -23,7 +23,7 @@ typedef std::vector<PointCloudTA::Ptr> vPointCloudTA;
 namespace EXX{
 
 struct planeDescriptor{
-    Eigen::Vector3f massCenter;;
+    Eigen::Vector3f massCenter;
     double boundingBoxArea;
     double hullArea;
     double hullBoundingBoxRatio;
@@ -35,14 +35,16 @@ struct planeDescriptor{
 class planeFeatures{
     boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer;
     bool viewerIsSet;
+    double bigPlaneSize;
 
 public:
-    planeFeatures() : viewerIsSet(false) {};
+    planeFeatures() : viewerIsSet(false), bigPlaneSize(0.8) {};
     ~planeFeatures(){};
 
     // Calculate features for each plane in planes.
     void calculateFeatures(vPointCloudT planes, vPointCloudT hulls, std::vector<Eigen::Vector4d> normal, std::vector<int> normalInd, std::vector<planeDescriptor> *vPlaneDescriptor);
     void matchSimilarFeatures(std::vector<planeDescriptor> descriptor, std::vector<std::set<int> > *sets);
+    void findRepeatingObjects(vPointCloudT planes, std::vector<planeDescriptor> desc, std::vector<std::set<int> > sets, std::vector< std::set<int>> *objects);    
     void setViewer(boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer);
     
 private:
@@ -60,6 +62,9 @@ private:
     // Takes in min and max points for a bounding box and returns the biggest area
     // and the ratio of length and with for the area.
     static void getBiggestCubeArea(PointT minPoint, PointT maxPoint, double *area, double *WLRatio);
+
+    // Returns the euclidean distance between two points.
+    static double euclideanDistance(Eigen::Vector3f a, Eigen::Vector3f b);
 
     // Prints the planeDescriptor in a good way.
     static void printDescriptor(planeDescriptor descr);

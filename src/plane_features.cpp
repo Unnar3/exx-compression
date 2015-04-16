@@ -23,7 +23,7 @@ namespace EXX{
         double area;
         double wlRatio;
         bool hasAdded = false;
-
+        double averageNumberOfPointsPerArea = 0;
         // calculate features for each plane.
         for (size_t i = 0; i < planes.size(); ++i){
             
@@ -38,7 +38,7 @@ namespace EXX{
             pDescriptor.massCenter = mass_center;
             planeFeatures::getBiggestCubeArea(min_point_OBB, max_point_OBB, &area, &wlRatio);
             if (viewerIsSet == true){                
-                if (area > 0.8){
+                if (area > bigPlaneSize){
                     viewer->addCube (min_point_OBB.x, max_point_OBB.x, min_point_OBB.y, max_point_OBB.y, min_point_OBB.z, max_point_OBB.z, 1.0, 1.0, 0.0, "a"+std::to_string(i));
                     viewer->addCube (position, quat, max_point_OBB.x - min_point_OBB.x, max_point_OBB.y - min_point_OBB.y, max_point_OBB.z - min_point_OBB.z, "o"+std::to_string(i));
                 } else {
@@ -53,7 +53,9 @@ namespace EXX{
             pDescriptor.normal = normal.at(     normalInd.at(i) );
             vPlaneDescriptor->push_back(pDescriptor);
             // printDescriptor(pDescriptor);
+            averageNumberOfPointsPerArea += planes[i]->points.size() / area;
         }
+        std::cout << "average number of points: " << averageNumberOfPointsPerArea / planes.size() << std::endl;
     }
 
     void planeFeatures::matchSimilarFeatures(std::vector<planeDescriptor> desc, std::vector<std::set<int> > *sets){
@@ -77,7 +79,7 @@ namespace EXX{
             
             floorAngle = planeFeatures::angleToFloor( desc[i].normal );
             // find walls.
-            if ( desc[i].boundingBoxArea > 0.8 &&  std::abs( floorAngle - M_PI/2 ) < M_PI/5  ){
+            if ( desc[i].boundingBoxArea > bigPlaneSize &&  std::abs( floorAngle - M_PI/2 ) < M_PI/5  ){
                 walls.insert( i );
                 filled.insert( i );
                 std::cout << "Found big wall: " << desc[i].boundingBoxArea << std::endl;
@@ -96,7 +98,7 @@ namespace EXX{
                 vDescriptor(0) = ( std::log( desc[i].boundingBoxArea ) - std::log( desc[j].boundingBoxArea ));
                 vDescriptor(1) = 0; //( std::log( desc[i].hullArea ) - std::log( desc[j].hullArea ));
                 vDescriptor(2) = 0; //( std::log( desc[i].hullBoundingBoxRatio ) - std::log( desc[j].hullBoundingBoxRatio ));
-                vDescriptor(3) = ( std::log( desc[i].widthLengthRatio ) - std::log( desc[j].widthLengthRatio ));
+                vDescriptor(3) = 2 * ( std::log( desc[i].widthLengthRatio ) - std::log( desc[j].widthLengthRatio ));
                 vDescriptor(4) = 2 * std::log( planeFeatures::angleBetweenVectors( desc[i].normal, desc[j].normal ));
                 norm = vDescriptor.norm();
                 mDescriptor(i,j) = norm;
@@ -131,6 +133,56 @@ namespace EXX{
         sets->push_back( floors );
         sets->push_back( walls );
     }   
+
+
+    void planeFeatures::findRepeatingObjects(vPointCloudT planes, std::vector<planeDescriptor> desc, std::vector<std::set<int> > sets, std::vector< std::set<int>> *objects){
+
+        double size = sets.size()-2;
+        Eigen::MatrixXd matching = Eigen::MatrixXd::Zero(size, size);
+        double hmm;
+        for (int iset = 0; iset < size; ++iset){
+            for ( auto i : sets.at(iset) ){
+                if ( desc.at(i).boundingBoxArea > bigPlaneSize ){ continue; }
+                
+                for (int jset = 0; jset < size; ++jset){
+                    for ( auto j : sets.at(jset) ){
+                        if ( j == i ) { continue; }
+                        if ( desc.at(j).boundingBoxArea > bigPlaneSize ){ continue; }
+                        hmm = planeFeatures::euclideanDistance( desc.at(i).massCenter, desc.at(j).massCenter);
+                        std::cout << hmm << std::endl;
+                        if ( hmm > 1.0 ){ continue; }
+                        
+                        if ( iset > jset){
+                            matching(iset,jset) += 1; 
+                        } else {
+                            matching(jset,iset) += 1; 
+                        }
+                    }
+                }
+            }
+        }
+
+        std::cout << "Object matching" << std::endl;
+        std::cout << matching << std::endl;
+        std::set<int> s;
+        Eigen::MatrixXd::Index maxRow, maxCol;
+        // for ( size_t i = 0; i < matching.rows(); ++i ){
+        //     for ( size_t j = 0; j < matching.cols(); ++j  ){
+        //         if (matching(i,j) > 14){
+        //             s.clear();
+        //             s.insert(i);
+        //             s.insert(j);
+        //             objects->push_back( s );
+        //         }
+        //     }
+        // }
+        matching.maxCoeff(&maxRow, &maxCol);
+        s.clear();
+        s.insert(maxRow);
+        s.insert(maxCol);
+        objects->push_back( s );
+
+    }
 
     void planeFeatures::setViewer(boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer){
         this->viewer = viewer;
@@ -211,6 +263,14 @@ namespace EXX{
         if( *WLRatio > 1 ){
             *WLRatio = 1 / *WLRatio;
         }
+    }
+
+    double planeFeatures::euclideanDistance(Eigen::Vector3f a, Eigen::Vector3f b){
+        a(0) -= b(0);
+        a(1) -= b(1);
+        a(2) -= b(2);
+
+        return a.norm();
     }
 
 
