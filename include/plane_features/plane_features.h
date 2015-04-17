@@ -42,6 +42,9 @@ public:
     ~planeFeatures(){};
 
     // Calculate features for each plane in planes.
+    void loadFeatures(const vPointCloudT &planes, const std::vector<Eigen::Vector4d> &normal, const std::vector<int> &normalInd, flann::Matrix<double> &dataset);
+    void matchFeatures(const flann::Matrix<double> &features, flann::Matrix<int> &indices);
+
     void calculateFeatures(vPointCloudT planes, vPointCloudT hulls, std::vector<Eigen::Vector4d> normal, std::vector<int> normalInd, std::vector<planeDescriptor> *vPlaneDescriptor);
     void matchSimilarFeatures(std::vector<planeDescriptor> descriptor, std::vector<std::set<int> > *sets);
     void findRepeatingObjects(vPointCloudT planes, std::vector<planeDescriptor> desc, std::vector<std::set<int> > sets, std::vector< std::set<int>> *objects);    

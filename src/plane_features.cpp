@@ -1,8 +1,84 @@
 #include <plane_features/plane_features.h>
 #include <pcl/common/common.h>
+#include <pcl/kdtree/kdtree_flann.h>
 
 
 namespace EXX{
+
+
+    void planeFeatures::loadFeatures(const vPointCloudT &planes, const std::vector<Eigen::Vector4d> &normal, const std::vector<int> &normalInd, flann::Matrix<double> &features){
+        
+        features = flann::Matrix<double>(new double[planes.size()*3], planes.size(), 3 );
+        
+        pcl::MomentOfInertiaEstimation<PointT> feature_extractor;
+        PointT min_point_OBB;
+        PointT max_point_OBB;
+        PointT position_OBB;
+        Eigen::Matrix3f rotational_matrix_OBB;  
+        Eigen::Vector3f mass_center;
+
+        double area;
+        double wlRatio;
+        double averageNumberOfPointsPerArea = 0;
+        double floorAngle;
+        // calculate features for each plane.
+        for (size_t i = 0; i < planes.size(); ++i){
+            
+            feature_extractor.setInputCloud (planes[i]);
+            feature_extractor.compute ();
+            feature_extractor.getMassCenter( mass_center );
+            feature_extractor.getOBB (min_point_OBB, max_point_OBB, position_OBB, rotational_matrix_OBB);
+            Eigen::Vector3f position (position_OBB.x, position_OBB.y, position_OBB.z);
+            Eigen::Quaternionf quat (rotational_matrix_OBB);
+            planeFeatures::getBiggestCubeArea(min_point_OBB, max_point_OBB, &area, &wlRatio);
+            
+            if (viewerIsSet == true){                
+                if (area > bigPlaneSize){
+                    viewer->addCube (min_point_OBB.x, max_point_OBB.x, min_point_OBB.y, max_point_OBB.y, min_point_OBB.z, max_point_OBB.z, 1.0, 1.0, 0.0, "a"+std::to_string(i));
+                    viewer->addCube (position, quat, max_point_OBB.x - min_point_OBB.x, max_point_OBB.y - min_point_OBB.y, max_point_OBB.z - min_point_OBB.z, "o"+std::to_string(i));
+                } else {
+                    viewer->addCube (min_point_OBB.x, max_point_OBB.x, min_point_OBB.y, max_point_OBB.y, min_point_OBB.z, max_point_OBB.z, 1.0, 0.0, 1.0, "a"+std::to_string(i));
+                }
+            }
+            averageNumberOfPointsPerArea += planes[i]->points.size() / area;
+            floorAngle = planeFeatures::angleToFloor( normal.at( normalInd.at(i) ));
+            
+            // Check if it is a wall;
+            if ( area > bigPlaneSize &&  std::abs( floorAngle - M_PI/2 ) < M_PI/5 ){
+                features[i][0] = std::log(0);
+                features[i][1] = std::log(0);
+                features[i][2] = std::log(0);
+            }
+            else if ( mass_center(2) < 0.2 && std::abs( floorAngle - M_PI/2 ) > M_PI/2 - M_PI/5 ){
+                features[i][0] = std::log(0);
+                features[i][1] = std::log(0);
+                features[i][2] = std::log(0);
+            }
+            else{
+                features[i][0] = std::log( area );
+                features[i][1] = std::log( wlRatio );
+                features[i][2] = 2 * std::log( floorAngle );
+            }
+        }
+    }
+
+    void planeFeatures::matchFeatures(const flann::Matrix<double> &features, flann::Matrix<int> &indices){
+
+        // Maximum neighbours found using radius search;
+        int nn = 30;
+        indices = flann::Matrix<int>(new int[features.rows*nn], features.rows, nn);
+
+        flann::Matrix<double> dists(new double[features.rows*nn], features.rows, nn);
+
+        // construct an randomized kd-tree index using 4 kd-trees
+        flann::Index<flann::L2<double> > index(features, flann::KDTreeIndexParams(4));
+        index.buildIndex();
+        float radius = 1.0;
+        std::vector<int> num_inliers;
+        index.radiusSearch(features, indices, dists, radius, flann::SearchParams(128));
+        // std::cout << "k: " << num_inliers << std::endl;
+    }
+
 
 
     void planeFeatures::calculateFeatures(vPointCloudT planes, vPointCloudT hulls, std::vector<Eigen::Vector4d> normal, std::vector<int> normalInd, std::vector<planeDescriptor> *vPlaneDescriptor){
@@ -10,6 +86,8 @@ namespace EXX{
         if ( planes.size() != hulls.size() ){
             // TODO: break in some way.
         }
+
+        flann::Matrix<double> dataset(new double[planes.size()*3], planes.size(), 3 );
 
         pcl::MomentOfInertiaEstimation<PointT> feature_extractor;
         PointT min_point_OBB;
@@ -50,7 +128,7 @@ namespace EXX{
             pDescriptor.hullArea = double( pcl::calculatePolygonArea(*hulls[i]) );
             pDescriptor.hullBoundingBoxRatio = pDescriptor.hullArea / pDescriptor.boundingBoxArea;
             pDescriptor.widthLengthRatio = wlRatio;
-            pDescriptor.normal = normal.at(     normalInd.at(i) );
+            pDescriptor.normal = normal.at(normalInd.at(i));
             vPlaneDescriptor->push_back(pDescriptor);
             // printDescriptor(pDescriptor);
             averageNumberOfPointsPerArea += planes[i]->points.size() / area;

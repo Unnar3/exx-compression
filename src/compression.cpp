@@ -100,7 +100,7 @@ namespace EXX{
 		seg.setMaxIterations (max_ite_);
 		seg.setDistanceThreshold (dist_thresh_);
 		seg.setEpsAngle (2*M_PI);
-		seg.setNormalDistanceWeight (0.1);
+		seg.setNormalDistanceWeight (0.2);
 
 		// Estimate point normals
 		ne.setSearchMethod (tree);
