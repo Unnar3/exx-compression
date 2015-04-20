@@ -5,6 +5,7 @@
 #include <pcl/point_cloud.h>
 #include <pcl/ModelCoefficients.h>
 #include <pcl/surface/gp3.h>
+#include <Eigen/Dense>
 
 typedef pcl::PointXYZRGB PointT;
 typedef pcl::PointCloud<PointT> PointCloudT;
@@ -88,12 +89,15 @@ public:
 	// RANSAC METHODS
 	void extractPlanesRANSAC(PointCloudT::Ptr cloud, planesAndCoeffs *pac);
 	void projectToPlane(planesAndCoeffs *pac);
+	static void projectToPlaneS(PointCloudT::Ptr cloud, Eigen::Vector4d coeff);
+	static void projectToPlaneS(PointCloudT::Ptr cloud, ModelCoeffT::Ptr coeff);
 
 	// EUCLIDIAN CLUSTERING OF PLANES
 	void euclideanClusterPlanes(vPointCloudT* cloud, vPointCloudT* out_vec, std::vector<int> *normalIndex);
 
 	// CONCAVE HULLS
 	void planeToConcaveHull(vPointCloudT *planes, vPointCloudT *hulls);
+	void planeToConvexHull(vPointCloudT &planes, vPointCloudT &hulls, std::vector<double> &area);
 	void reumannWitkamLineSimplification(vPointCloudT* hulls, vPointCloudT* s_hulls);
 
 	// TRIANGULATION
@@ -145,6 +149,7 @@ private:
 	double pointToLineDistance(PointT current, PointT next, PointT nextCheck);
 	double distBetweenPoints(PointT a, PointT b);
 	PointCloudT::Ptr planeToConcaveHull_s(PointCloudT::Ptr cloud);
+	void planeToConvexHull_s(const PointCloudT::Ptr cloud, PointCloudT::Ptr out, double &area);
 	PointCloudT::Ptr reumannWitkamLineSimplification_s(PointCloudT::Ptr cloud);
 	void savePCD(PointCloudT::Ptr cloud, std::string name);
 	void savePCD(std::vector<PointCloudT::Ptr> cloud, std::string name);

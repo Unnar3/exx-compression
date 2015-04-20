@@ -42,8 +42,9 @@ public:
     ~planeFeatures(){};
 
     // Calculate features for each plane in planes.
-    void loadFeatures(const vPointCloudT &planes, const std::vector<Eigen::Vector4d> &normal, const std::vector<int> &normalInd, flann::Matrix<double> &dataset);
+    void loadFeatures(const vPointCloudT &planes, vPointCloudT hulls, const std::vector<Eigen::Vector4d> &normal, const std::vector<int> &normalInd, std::vector<double> area, flann::Matrix<double> &features, std::set<int> &walls, std::set<int> &floors);
     void matchFeatures(const flann::Matrix<double> &features, flann::Matrix<int> &indices);
+    void groupFeatures(const flann::Matrix<int> &indices, std::set<std::set<int> > &sets);
 
     void calculateFeatures(vPointCloudT planes, vPointCloudT hulls, std::vector<Eigen::Vector4d> normal, std::vector<int> normalInd, std::vector<planeDescriptor> *vPlaneDescriptor);
     void matchSimilarFeatures(std::vector<planeDescriptor> descriptor, std::vector<std::set<int> > *sets);
@@ -71,6 +72,9 @@ private:
 
     // Prints the planeDescriptor in a good way.
     static void printDescriptor(planeDescriptor descr);
+
+    static float calculatePolygonAreaMine (const PointCloudT &polygon);
+    static float calculatePolygonAreaMineInv (const PointCloudT &polygon);
 
 };
 

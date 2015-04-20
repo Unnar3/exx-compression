@@ -168,6 +168,28 @@ namespace EXX{
 		}
 	}
 
+	void compression::projectToPlaneS(PointCloudT::Ptr cloud, Eigen::Vector4d coeff){
+		std::cout << "reyna ap breyta í coeffs" << std::endl;
+		pcl::ModelCoefficients::Ptr m_coeff (new pcl::ModelCoefficients ());
+		m_coeff->values.resize (4);
+		m_coeff->values[0] = float(coeff(0));
+		m_coeff->values[1] = float(coeff(1));
+		m_coeff->values[2] = float(coeff(2));
+		m_coeff->values[3] = float(coeff(3));
+		compression::projectToPlaneS(cloud, m_coeff);
+		std::cout << "virkaði" << std::endl;
+	}	
+
+	void compression::projectToPlaneS(PointCloudT::Ptr cloud, ModelCoeffT::Ptr coeff){
+
+		// Create the projection object
+		pcl::ProjectInliers<PointT> proj;
+		proj.setModelType (pcl::SACMODEL_PLANE);
+	    proj.setInputCloud ( cloud );
+	    proj.setModelCoefficients ( coeff );
+	    proj.filter ( *cloud );
+	}
+
 	void compression::planeToConcaveHull(vPointCloudT *planes, vPointCloudT *hulls){
 
 		vPointCloudT::iterator it = planes->begin();
@@ -187,6 +209,29 @@ namespace EXX{
         chull.reconstruct (*cloud_hull);
 
 		return cloud_hull;
+	}
+
+	void compression::planeToConvexHull(vPointCloudT &planes, vPointCloudT &hulls, std::vector<double> &area){
+
+		vPointCloudT::iterator it = planes.begin();
+		double are = 0;
+		for ( ; it < planes.end(); ++it)
+		{	
+			PointCloudT::Ptr out (new PointCloudT ());;
+			compression::planeToConvexHull_s(*it, out, are);
+			hulls.push_back( out );
+			area.push_back(are);
+		}
+	}
+
+	void compression::planeToConvexHull_s(const PointCloudT::Ptr cloud, PointCloudT::Ptr out, double &area ){
+		
+		pcl::ConvexHull<PointT> chull;
+		chull.setInputCloud ( cloud );
+        //chull.setAlpha ( hull_alpha_ );
+        chull.setComputeAreaVolume(true);
+        chull.reconstruct (*out);
+        area = chull.getTotalArea();
 	}
 
 	void compression::reumannWitkamLineSimplification(vPointCloudT* hulls, vPointCloudT* s_hulls){

@@ -1,4 +1,5 @@
 #include <plane_features/plane_features.h>
+#include <exx_compression/compression.h>
 #include <pcl/common/common.h>
 #include <pcl/kdtree/kdtree_flann.h>
 
@@ -6,7 +7,7 @@
 namespace EXX{
 
 
-    void planeFeatures::loadFeatures(const vPointCloudT &planes, const std::vector<Eigen::Vector4d> &normal, const std::vector<int> &normalInd, flann::Matrix<double> &features){
+    void planeFeatures::loadFeatures(const vPointCloudT &planes, vPointCloudT hulls, const std::vector<Eigen::Vector4d> &normal, const std::vector<int> &normalInd, std::vector<double> area_in, flann::Matrix<double> &features, std::set<int> &walls, std::set<int> &floors){
         
         features = flann::Matrix<double>(new double[planes.size()*3], planes.size(), 3 );
         
@@ -31,13 +32,17 @@ namespace EXX{
             Eigen::Vector3f position (position_OBB.x, position_OBB.y, position_OBB.z);
             Eigen::Quaternionf quat (rotational_matrix_OBB);
             planeFeatures::getBiggestCubeArea(min_point_OBB, max_point_OBB, &area, &wlRatio);
-            
+
+            // compare bounding box and hull area
+            std::cout << "compare bounding box and hull area: " << std::endl;
+            std::cout << "bounding box area: " << area << std::endl;
+            std::cout << "convex hull area: " << area_in[i]/2 << std::endl;
+            std::cout << " " << std::endl;
+
             if (viewerIsSet == true){                
                 if (area > bigPlaneSize){
                     viewer->addCube (min_point_OBB.x, max_point_OBB.x, min_point_OBB.y, max_point_OBB.y, min_point_OBB.z, max_point_OBB.z, 1.0, 1.0, 0.0, "a"+std::to_string(i));
                     viewer->addCube (position, quat, max_point_OBB.x - min_point_OBB.x, max_point_OBB.y - min_point_OBB.y, max_point_OBB.z - min_point_OBB.z, "o"+std::to_string(i));
-                } else {
-                    viewer->addCube (min_point_OBB.x, max_point_OBB.x, min_point_OBB.y, max_point_OBB.y, min_point_OBB.z, max_point_OBB.z, 1.0, 0.0, 1.0, "a"+std::to_string(i));
                 }
             }
             averageNumberOfPointsPerArea += planes[i]->points.size() / area;
@@ -48,15 +53,17 @@ namespace EXX{
                 features[i][0] = std::log(0);
                 features[i][1] = std::log(0);
                 features[i][2] = std::log(0);
+                walls.insert(i);
             }
             else if ( mass_center(2) < 0.2 && std::abs( floorAngle - M_PI/2 ) > M_PI/2 - M_PI/5 ){
                 features[i][0] = std::log(0);
                 features[i][1] = std::log(0);
                 features[i][2] = std::log(0);
+                floors.insert(i);
             }
             else{
                 features[i][0] = std::log( area );
-                features[i][1] = std::log( wlRatio );
+                features[i][1] = 2 * std::log( wlRatio );
                 features[i][2] = 2 * std::log( floorAngle );
             }
         }
@@ -77,6 +84,51 @@ namespace EXX{
         std::vector<int> num_inliers;
         index.radiusSearch(features, indices, dists, radius, flann::SearchParams(128));
         // std::cout << "k: " << num_inliers << std::endl;
+    }
+
+    void planeFeatures::groupFeatures(const flann::Matrix<int> &indices, std::set<std::set<int> > &sets){
+        
+        // load the matrix into sets
+        std::set<int> set;
+        for (size_t j = 0; j < indices.rows; ++j){
+            for (size_t i = 0; i < indices.cols; ++i){
+                if ( indices[j][i] == -1 ){ 
+                    break; 
+                }
+                set.insert( indices[j][i] );
+            }
+            sets.insert(set);
+            set.clear();
+        }
+
+        // Make sure sets don't intersect
+        std::set<int> tmp;
+        std::set<std::set<int> >::iterator it = sets.begin();
+        std::set<std::set<int> >::iterator ite;
+        for ( ; it != sets.end(); ++it){
+            if (it->size() == 0){
+                //sets.remove( it );
+                continue;
+            }
+            for ( ite = it; ite != sets.end(); ++ite){
+                if ( ite->size() == 0 || ite == it){
+                    continue;
+                }
+                tmp.clear();
+                if (it->size() >= ite->size()){
+                    std::set_difference(ite->begin(), ite->end(), it->begin(), it->end(), 
+                        std::inserter(tmp, tmp.begin()));
+                    (*ite).swap(tmp);
+                } else {
+                    std::set_difference(it->begin(), it->end(), ite->begin(), ite->end(), 
+                        std::inserter(tmp, tmp.begin()));
+                    (*it).swap(tmp);
+                    if(it->size() == 0){
+                        break;
+                    }
+                }
+            }
+        }
     }
 
 
@@ -362,6 +414,44 @@ namespace EXX{
         std::cout << "Normal:           \t" << descr.normal.transpose() << std::endl;
         std::cout << " " << std::endl;
 
+    }
+
+    float planeFeatures::calculatePolygonAreaMine (const PointCloudT &polygon) 
+    {
+        float area = 0.0f;
+        int num_points = polygon.size ();
+        int j = 0;
+        Eigen::Vector3f va,vb,res;
+
+        res(0) = res(1) = res(2) = 0.0f;
+        for (int i = 0; i < num_points; ++i) 
+        {
+            j = (i + 1) % num_points;
+            va = polygon[i].getVector3fMap ();
+            vb = polygon[j].getVector3fMap ();
+            res += va.cross (vb);
+        }
+        area = res.norm ();
+        return (area*0.5);
+    }
+
+    float planeFeatures::calculatePolygonAreaMineInv (const PointCloudT &polygon) 
+    {
+        float area = 0.0f;
+        int num_points = polygon.size ();
+        int j = 0;
+        Eigen::Vector3f va,vb,res;
+
+        res(0) = res(1) = res(2) = 0.0f;
+        for (int i = num_points-1; i >= 0; --i) 
+        {
+            j = (i + 1) % num_points;
+            va = polygon[i].getVector3fMap ();
+            vb = polygon[j].getVector3fMap ();
+            res += va.cross (vb);
+        }
+        area = res.norm ();
+        return (area*0.5);
     }
 
 }
