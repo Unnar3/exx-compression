@@ -9,7 +9,9 @@ namespace EXX{
 
     void planeFeatures::loadFeatures(const vPointCloudT &planes, vPointCloudT hulls, const std::vector<Eigen::Vector4d> &normal, const std::vector<int> &normalInd, std::vector<double> area_in, flann::Matrix<double> &features, std::set<int> &walls, std::set<int> &floors){
         
-        features = flann::Matrix<double>(new double[planes.size()*3], planes.size(), 3 );
+
+        int nof = 4;
+        features = flann::Matrix<double>(new double[planes.size()*nof], planes.size(), nof );
         
         pcl::MomentOfInertiaEstimation<PointT> feature_extractor;
         PointT min_point_OBB;
@@ -53,18 +55,21 @@ namespace EXX{
                 features[i][0] = std::log(0);
                 features[i][1] = std::log(0);
                 features[i][2] = std::log(0);
+                features[i][3] = std::log(0);
                 walls.insert(i);
             }
             else if ( mass_center(2) < 0.2 && std::abs( floorAngle - M_PI/2 ) > M_PI/2 - M_PI/5 ){
                 features[i][0] = std::log(0);
                 features[i][1] = std::log(0);
                 features[i][2] = std::log(0);
+                features[i][3] = std::log(0);
                 floors.insert(i);
             }
             else{
                 features[i][0] = std::log( area );
                 features[i][1] = 2 * std::log( wlRatio );
                 features[i][2] = 2 * std::log( floorAngle );
+                features[i][2] = mass_center(2);
             }
         }
     }
