@@ -42,6 +42,12 @@ namespace EXX{
             }
             averageNumberOfPointsPerArea += planes[i]->points.size() / area;
             
+            std::cout << "difference:" << std::endl;
+            std::cout << "pos: " << position << std::endl;
+            std::cout << "mas: " << mass_center << std::endl;
+            std::cout << " " << std::endl;
+
+
             // Find angle to floor and convert to range [0,1] where 0 means 90 degrees and 
             // 1 means zero or 180 degrees.
             floorAngle = planeFeatures::angleToFloor( normal.at( normalInd.at(i) ));
@@ -69,6 +75,7 @@ namespace EXX{
                 fSet.features[i][2] = 2 * floorAngle / (M_PI/2);
                 fSet.features[i][3] = 4 * mass_center(2);
             }
+            fSet.position.push_back(position);
         }
     }
 
@@ -134,8 +141,30 @@ namespace EXX{
         }
     }
 
-    void planeFeatures::improveWalls(featureSet &fSet){
+    void planeFeatures::improveWalls(const vPointCloudT &planes, featureSet &fSet){
+        PointCloudT::Ptr cloud (new PointCloudT ());
+        for (auto i : fSet.walls){
+            *cloud += *planes.at(i);
+        }
+        pcl::KdTreeFLANN<PointT> kdtree;
+        kdtree.setInputCloud (cloud);
+        PointT searchPoint;
 
+        std::vector<int> pointIdx;
+        std::vector<float> pointRadius;
+        float radius = 0.35f;
+
+        for ( auto set : fSet.objects ){
+            for ( auto i : set ){
+                searchPoint.x = fSet.position.at(i)(0);
+                searchPoint.y = fSet.position.at(i)(1);
+                searchPoint.z = fSet.position.at(i)(2);
+                if (kdtree.radiusSearch (searchPoint, radius, pointIdx, pointRadius) > 0){
+                    fSet.walls.insert(i);
+                    set.erase(i);
+                }
+            }
+        }
     }
 
 

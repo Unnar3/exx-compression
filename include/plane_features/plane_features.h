@@ -38,6 +38,7 @@ struct featureSet{
     std::set<std::set<int> > objects;
     std::set<int> walls;
     std::set<int> floors;
+    std::vector<Eigen::Vector3f> position;
 };
 
 class planeFeatures{
@@ -53,7 +54,7 @@ public:
     void loadFeatures(const vPointCloudT &planes, const std::vector<Eigen::Vector4d> &normal, const std::vector<int> &normalInd, featureSet &fSet);
     void matchFeatures(featureSet &fSet);
     void groupFeatures(featureSet &fSet);
-    void improveWalls(featureSet &fSet);
+    void improveWalls(const vPointCloudT &planes, featureSet &fSet);
 
     void calculateFeatures(vPointCloudT planes, vPointCloudT hulls, std::vector<Eigen::Vector4d> normal, std::vector<int> normalInd, std::vector<planeDescriptor> *vPlaneDescriptor);
     void matchSimilarFeatures(std::vector<planeDescriptor> descriptor, std::vector<std::set<int> > *sets);
