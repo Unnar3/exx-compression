@@ -32,6 +32,14 @@ struct planeDescriptor{
     Eigen::Vector4d normal;
 };
 
+struct featureSet{
+    flann::Matrix<double> features;
+    flann::Matrix<int> indices;
+    std::set<std::set<int> > objects;
+    std::set<int> walls;
+    std::set<int> floors;
+};
+
 class planeFeatures{
     boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer;
     bool viewerIsSet;
@@ -42,9 +50,10 @@ public:
     ~planeFeatures(){};
 
     // Calculate features for each plane in planes.
-    void loadFeatures(const vPointCloudT &planes, vPointCloudT hulls, const std::vector<Eigen::Vector4d> &normal, const std::vector<int> &normalInd, std::vector<double> area, flann::Matrix<double> &features, std::set<int> &walls, std::set<int> &floors);
-    void matchFeatures(const flann::Matrix<double> &features, flann::Matrix<int> &indices);
-    void groupFeatures(const flann::Matrix<int> &indices, std::set<std::set<int> > &sets);
+    void loadFeatures(const vPointCloudT &planes, const std::vector<Eigen::Vector4d> &normal, const std::vector<int> &normalInd, featureSet &fSet);
+    void matchFeatures(featureSet &fSet);
+    void groupFeatures(featureSet &fSet);
+    void improveWalls(featureSet &fSet);
 
     void calculateFeatures(vPointCloudT planes, vPointCloudT hulls, std::vector<Eigen::Vector4d> normal, std::vector<int> normalInd, std::vector<planeDescriptor> *vPlaneDescriptor);
     void matchSimilarFeatures(std::vector<planeDescriptor> descriptor, std::vector<std::set<int> > *sets);

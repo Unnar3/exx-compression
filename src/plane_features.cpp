@@ -7,12 +7,11 @@
 namespace EXX{
 
 
-    void planeFeatures::loadFeatures(const vPointCloudT &planes, vPointCloudT hulls, const std::vector<Eigen::Vector4d> &normal, const std::vector<int> &normalInd, std::vector<double> area_in, flann::Matrix<double> &features, std::set<int> &walls, std::set<int> &floors){
+    void planeFeatures::loadFeatures(const vPointCloudT &planes, const std::vector<Eigen::Vector4d> &normal, const std::vector<int> &normalInd, featureSet &fSet){
         
-
         int nof = 4;
-        features = flann::Matrix<double>(new double[planes.size()*nof], planes.size(), nof );
-        
+        // features = flann::Matrix<double>(new double[planes.size()*nof], planes.size(), nof );
+        fSet.features = flann::Matrix<double>(new double[planes.size()*nof], planes.size(), nof );
         pcl::MomentOfInertiaEstimation<PointT> feature_extractor;
         PointT min_point_OBB;
         PointT max_point_OBB;
@@ -35,12 +34,6 @@ namespace EXX{
             Eigen::Quaternionf quat (rotational_matrix_OBB);
             planeFeatures::getBiggestCubeArea(min_point_OBB, max_point_OBB, &area, &wlRatio);
 
-            // compare bounding box and hull area
-            std::cout << "compare bounding box and hull area: " << std::endl;
-            std::cout << "bounding box area: " << area << std::endl;
-            std::cout << "convex hull area: " << area_in[i]/2 << std::endl;
-            std::cout << " " << std::endl;
-
             if (viewerIsSet == true){                
                 if (area > bigPlaneSize){
                     viewer->addCube (min_point_OBB.x, max_point_OBB.x, min_point_OBB.y, max_point_OBB.y, min_point_OBB.z, max_point_OBB.z, 1.0, 1.0, 0.0, "a"+std::to_string(i));
@@ -48,74 +41,79 @@ namespace EXX{
                 }
             }
             averageNumberOfPointsPerArea += planes[i]->points.size() / area;
-            floorAngle = planeFeatures::angleToFloor( normal.at( normalInd.at(i) ));
             
-            // Check if it is a wall;
-            if ( area > bigPlaneSize &&  std::abs( floorAngle - M_PI/2 ) < M_PI/5 ){
-                features[i][0] = std::log(0);
-                features[i][1] = std::log(0);
-                features[i][2] = std::log(0);
-                features[i][3] = std::log(0);
-                walls.insert(i);
+            // Find angle to floor and convert to range [0,1] where 0 means 90 degrees and 
+            // 1 means zero or 180 degrees.
+            floorAngle = planeFeatures::angleToFloor( normal.at( normalInd.at(i) ));
+            floorAngle = std::abs(floorAngle - M_PI/2);
+            
+            // Check if it is a wall and set to inf;
+            if ( area > bigPlaneSize &&  floorAngle < M_PI/5 ){
+                fSet.features[i][0] = std::log(0);
+                fSet.features[i][1] = std::log(0);
+                fSet.features[i][2] = std::log(0);
+                fSet.features[i][3] = std::log(0);
+                fSet.walls.insert(i);
             }
-            else if ( mass_center(2) < 0.2 && std::abs( floorAngle - M_PI/2 ) > M_PI/2 - M_PI/5 ){
-                features[i][0] = std::log(0);
-                features[i][1] = std::log(0);
-                features[i][2] = std::log(0);
-                features[i][3] = std::log(0);
-                floors.insert(i);
+            // Check if floor and set to inf
+            else if ( mass_center(2) < 0.2 && floorAngle > M_PI/2 - M_PI/5 ){
+                fSet.features[i][0] = std::log(0);
+                fSet.features[i][1] = std::log(0);
+                fSet.features[i][2] = std::log(0);
+                fSet.features[i][3] = std::log(0);
+                fSet.floors.insert(i);
             }
             else{
-                features[i][0] = std::log( area );
-                features[i][1] = 2 * std::log( wlRatio );
-                features[i][2] = 2 * std::log( floorAngle );
-                features[i][2] = mass_center(2);
+                fSet.features[i][0] = std::log( area );
+                fSet.features[i][1] = 2 * std::log( wlRatio );
+                fSet.features[i][2] = 2 * floorAngle / (M_PI/2);
+                fSet.features[i][3] = 4 * mass_center(2);
             }
         }
     }
 
-    void planeFeatures::matchFeatures(const flann::Matrix<double> &features, flann::Matrix<int> &indices){
+    void planeFeatures::matchFeatures(featureSet &fSet){
 
         // Maximum neighbours found using radius search;
         int nn = 30;
-        indices = flann::Matrix<int>(new int[features.rows*nn], features.rows, nn);
+        fSet.indices = flann::Matrix<int>(new int[fSet.features.rows*nn], fSet.features.rows, nn);
 
-        flann::Matrix<double> dists(new double[features.rows*nn], features.rows, nn);
+        flann::Matrix<double> dists(new double[fSet.features.rows*nn], fSet.features.rows, nn);
 
         // construct an randomized kd-tree index using 4 kd-trees
-        flann::Index<flann::L2<double> > index(features, flann::KDTreeIndexParams(4));
+        flann::Index<flann::L2<double> > index(fSet.features, flann::KDTreeIndexParams(4));
         index.buildIndex();
         float radius = 1.0;
         std::vector<int> num_inliers;
-        index.radiusSearch(features, indices, dists, radius, flann::SearchParams(128));
+        index.radiusSearch(fSet.features, fSet.indices, dists, radius, flann::SearchParams(128));
         // std::cout << "k: " << num_inliers << std::endl;
     }
 
-    void planeFeatures::groupFeatures(const flann::Matrix<int> &indices, std::set<std::set<int> > &sets){
+    void planeFeatures::groupFeatures(featureSet &fSet){
         
         // load the matrix into sets
         std::set<int> set;
-        for (size_t j = 0; j < indices.rows; ++j){
-            for (size_t i = 0; i < indices.cols; ++i){
-                if ( indices[j][i] == -1 ){ 
+        for (size_t j = 0; j < fSet.indices.rows; ++j){
+            for (size_t i = 0; i < fSet.indices.cols; ++i){
+                if ( fSet.indices[j][i] == -1 ){ 
                     break; 
                 }
-                set.insert( indices[j][i] );
+                set.insert( fSet.indices[j][i] );
             }
-            sets.insert(set);
+            fSet.objects.insert(set);
             set.clear();
         }
 
         // Make sure sets don't intersect
         std::set<int> tmp;
-        std::set<std::set<int> >::iterator it = sets.begin();
+        std::set<std::set<int> >::iterator it = fSet.objects.begin();
         std::set<std::set<int> >::iterator ite;
-        for ( ; it != sets.end(); ++it){
+        for ( ; it != fSet.objects.end(); ++it){
             if (it->size() == 0){
                 //sets.remove( it );
                 continue;
             }
-            for ( ite = it; ite != sets.end(); ++ite){
+            for ( ite = it; ite != fSet.objects.end(); ++ite){
                 if ( ite->size() == 0 || ite == it){
                     continue;
                 }
@@ -134,6 +132,10 @@ namespace EXX{
                 }
             }
         }
+    }
+
+    void planeFeatures::improveWalls(featureSet &fSet){
+
     }
 
 
