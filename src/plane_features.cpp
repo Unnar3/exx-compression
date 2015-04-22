@@ -89,12 +89,12 @@ namespace EXX{
         std::vector<int> num_inliers;
         index.radiusSearch(fSet.features, fSet.indices, dists, radius, flann::SearchParams(128));
         // std::cout << "k: " << num_inliers << std::endl;
-        // dbscan scan;
-        // scan.cluster(fSet.features, 1.0, 4, c);
-        Rectangle rect;
-        rect.set_values(3,4);
-        std::vector<std::vector<int> > co;
-        rect.cluster(fSet.features, 1.0, 4, co); 
+        // Rectangle rect;
+        // rect.set_values(3,4);
+        // std::vector<std::vector<int> > co;
+        // rect.cluster(fSet.features, 1.0, 4, co); 
+        dbscan scan;
+        scan.cluster(fSet.features, 1.0, 4, c);
     }
 
     void planeFeatures::groupFeatures(featureSet &fSet){

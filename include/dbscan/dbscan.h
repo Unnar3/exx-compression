@@ -11,4 +11,5 @@ public:
 	void cluster( flann::Matrix<T> &features, double eps, int minPts, std::vector<std::vector<int> > &c);
 };
 }
+#include "dbscan.hpp"
 #endif

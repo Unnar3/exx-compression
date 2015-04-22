@@ -5,6 +5,5 @@ class Rectangle {
     void set_values (int,int);
     int area() {return width*height;}
 
-    template <typename T>
-	void cluster( flann::Matrix<T> &features, double eps, int minPts, std::vector<std::vector<int> > &c);
+    void cluster( flann::Matrix<double> &features, double eps, int minPts, std::vector<std::vector<int> > &co);
 };
