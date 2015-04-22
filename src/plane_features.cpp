@@ -41,11 +41,6 @@ namespace EXX{
                 }
             }
             averageNumberOfPointsPerArea += planes[i]->points.size() / area;
-            
-            std::cout << "difference:" << std::endl;
-            std::cout << "pos: " << position << std::endl;
-            std::cout << "mas: " << mass_center << std::endl;
-            std::cout << " " << std::endl;
 
 
             // Find angle to floor and convert to range [0,1] where 0 means 90 degrees and 
@@ -71,7 +66,7 @@ namespace EXX{
             }
             else{
                 fSet.features[i][0] = std::log( area );
-                fSet.features[i][1] = 2 * std::log( wlRatio );
+                fSet.features[i][1] = std::log( wlRatio );
                 fSet.features[i][2] = 2 * floorAngle / (M_PI/2);
                 fSet.features[i][3] = 4 * mass_center(2);
             }
@@ -79,7 +74,7 @@ namespace EXX{
         }
     }
 
-    void planeFeatures::matchFeatures(featureSet &fSet){
+    void planeFeatures::matchFeatures(featureSet &fSet, std::vector<std::vector<int> > &c){
 
         // Maximum neighbours found using radius search;
         int nn = 30;
@@ -94,6 +89,12 @@ namespace EXX{
         std::vector<int> num_inliers;
         index.radiusSearch(fSet.features, fSet.indices, dists, radius, flann::SearchParams(128));
         // std::cout << "k: " << num_inliers << std::endl;
+        // dbscan scan;
+        // scan.cluster(fSet.features, 1.0, 4, c);
+        Rectangle rect;
+        rect.set_values(3,4);
+        std::vector<std::vector<int> > co;
+        rect.cluster(fSet.features, 1.0, 4, co); 
     }
 
     void planeFeatures::groupFeatures(featureSet &fSet){
@@ -112,7 +113,7 @@ namespace EXX{
         }
 
         // Make sure sets don't intersect
-        std::set<int> tmp;
+        std::set<int > tmp;
         std::set<std::set<int> >::iterator it = fSet.objects.begin();
         std::set<std::set<int> >::iterator ite;
         for ( ; it != fSet.objects.end(); ++it){
@@ -150,22 +151,77 @@ namespace EXX{
         kdtree.setInputCloud (cloud);
         PointT searchPoint;
 
+        std::set<std::set<int> > new_object;
+        std::set<int> single_object;
         std::vector<int> pointIdx;
         std::vector<float> pointRadius;
-        float radius = 0.35f;
+        std::vector<int> newWalls;
 
         for ( auto set : fSet.objects ){
+            single_object.clear();
             for ( auto i : set ){
                 searchPoint.x = fSet.position.at(i)(0);
                 searchPoint.y = fSet.position.at(i)(1);
                 searchPoint.z = fSet.position.at(i)(2);
-                if (kdtree.radiusSearch (searchPoint, radius, pointIdx, pointRadius) > 0){
+                if (kdtree.radiusSearch (searchPoint, centroid_to_wall_distance_, pointIdx, pointRadius) > 0){
                     fSet.walls.insert(i);
-                    set.erase(i);
+                    std::cout << "found probable wall." << std::endl;
+                } else {
+                    single_object.insert(i);
                 }
             }
+            new_object.insert(single_object);
+            fSet.objectSize += single_object.size();
+        }
+        fSet.objects = new_object;
+    }
+
+    void planeFeatures::groupObjects(featureSet &fSet){
+
+
+        // load center point of all planes into flann::Matrix
+        int nn = 10;
+        // flann::Matrix<int> indices (new int[fSet.objectSize*nn], fSet.objectSize, nn);
+        // flann::Matrix<float> dists(new float[fSet.objectSize*nn], fSet.objectSize, nn);
+        std::vector< std::vector<int> > indices;
+        std::vector<std::vector<float> > dists;
+        flann::Matrix<float> features(new float[fSet.objectSize*3], fSet.objectSize, 3);
+        // construct an randomized kd-tree index using 4 kd-trees  
+        std::map< int, std::pair<int, int> > maps;
+
+        int k = 0;
+        int j = 0;
+        for ( auto set : fSet.objects){
+            for ( auto i : set){    
+                features[k][0] = fSet.position.at(i)(0);
+                features[k][1] = fSet.position.at(i)(1);
+                features[k][2] = fSet.position.at(i)(2);
+                maps[k] = std::make_pair(j, i);
+                k++;
+            }
+            j++;
+        }
+        flann::Index<flann::L2<float> > index(features, flann::KDTreeIndexParams(4));
+        index.buildIndex();
+        float radius = 1.0;
+        index.radiusSearch(features, indices, dists, radius, flann::SearchParams(128));
+
+        for (auto vec : indices){
+
         }
     }
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

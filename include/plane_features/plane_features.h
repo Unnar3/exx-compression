@@ -8,6 +8,8 @@
 #include <pcl/visualization/cloud_viewer.h>
 
 #include <moment_of_inertia/moment_of_inertia_estimation.h>
+#include "dbscan/dbscan.h"
+#include "dbscan/rectangle.h"
 #include <Eigen/Dense>
 #include <vector>
 
@@ -39,27 +41,40 @@ struct featureSet{
     std::set<int> walls;
     std::set<int> floors;
     std::vector<Eigen::Vector3f> position;
+    int objectSize;
 };
 
 class planeFeatures{
     boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer;
     bool viewerIsSet;
     double bigPlaneSize;
+    double centroid_to_wall_distance_;
 
 public:
-    planeFeatures() : viewerIsSet(false), bigPlaneSize(0.8) {};
+    planeFeatures() : 
+        viewerIsSet(false), 
+        bigPlaneSize(0.8),
+        centroid_to_wall_distance_(0.35f) {};
     ~planeFeatures(){};
 
     // Calculate features for each plane in planes.
     void loadFeatures(const vPointCloudT &planes, const std::vector<Eigen::Vector4d> &normal, const std::vector<int> &normalInd, featureSet &fSet);
-    void matchFeatures(featureSet &fSet);
+    // Nearest neighbour search using flann library
+    void matchFeatures(featureSet &fSet, std::vector<std::vector<int> > &c);
+    // Create clusters from nearest neighbour search and load into sets
     void groupFeatures(featureSet &fSet);
+    // Detects wall segments that were wrongly classified.
     void improveWalls(const vPointCloudT &planes, featureSet &fSet);
+    // Find repeating objects from set of planes
+    void groupObjects(featureSet &fSet);
 
     void calculateFeatures(vPointCloudT planes, vPointCloudT hulls, std::vector<Eigen::Vector4d> normal, std::vector<int> normalInd, std::vector<planeDescriptor> *vPlaneDescriptor);
     void matchSimilarFeatures(std::vector<planeDescriptor> descriptor, std::vector<std::set<int> > *sets);
     void findRepeatingObjects(vPointCloudT planes, std::vector<planeDescriptor> desc, std::vector<std::set<int> > sets, std::vector< std::set<int>> *objects);    
     void setViewer(boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer);
+
+    //Setter methods
+    void setCentroidToWallDistance( float dist ){ centroid_to_wall_distance_ = dist; }
     
 private:
 	// Takes in two vectors, returns angle between them in range 0 to 1  
