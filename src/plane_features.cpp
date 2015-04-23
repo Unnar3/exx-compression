@@ -65,7 +65,7 @@ namespace EXX{
                 fSet.floors.insert(i);
             }
             else{
-                fSet.features[i][0] = std::log( area );
+                fSet.features[i][0] = 2 * std::log( area );
                 fSet.features[i][1] = std::log( wlRatio );
                 fSet.features[i][2] = 2 * floorAngle / (M_PI/2);
                 fSet.features[i][3] = 4 * mass_center(2);
@@ -75,6 +75,11 @@ namespace EXX{
     }
 
     void planeFeatures::matchFeatures(featureSet &fSet, std::vector<std::vector<int> > &c){
+        dbscan scan;
+        scan.cluster(fSet.features, fSet.walls, fSet.floors, 0.5, 2, c);
+    }
+
+    void planeFeatures::matchFeatures(featureSet &fSet){
 
         // Maximum neighbours found using radius search;
         int nn = 30;
@@ -85,16 +90,9 @@ namespace EXX{
         // construct an randomized kd-tree index using 4 kd-trees
         flann::Index<flann::L2<double> > index(fSet.features, flann::KDTreeIndexParams(4));
         index.buildIndex();
-        float radius = 1.0;
+        double radius = 1.0;
         std::vector<int> num_inliers;
         index.radiusSearch(fSet.features, fSet.indices, dists, radius, flann::SearchParams(128));
-        // std::cout << "k: " << num_inliers << std::endl;
-        // Rectangle rect;
-        // rect.set_values(3,4);
-        // std::vector<std::vector<int> > co;
-        // rect.cluster(fSet.features, 1.0, 4, co); 
-        dbscan scan;
-        scan.cluster(fSet.features, 1.0, 4, c);
     }
 
     void planeFeatures::groupFeatures(featureSet &fSet){
@@ -174,6 +172,40 @@ namespace EXX{
             fSet.objectSize += single_object.size();
         }
         fSet.objects = new_object;
+    }
+
+    void planeFeatures::improveWalls(const vPointCloudT &planes, featureSet &fSet, std::vector<std::vector<int> > &c){
+        PointCloudT::Ptr cloud (new PointCloudT ());
+        for (auto i : fSet.walls){
+            *cloud += *planes.at(i);
+        }
+        pcl::KdTreeFLANN<PointT> kdtree;
+        kdtree.setInputCloud (cloud);
+        PointT searchPoint;
+
+        std::vector<std::vector<int> > new_object;
+        std::vector<int> single_object;
+        std::vector<int> pointIdx;
+        std::vector<float> pointRadius;
+        std::vector<int> newWalls;
+
+        for ( auto vec : c ){
+            single_object.clear();
+            for ( auto i : vec ){
+                searchPoint.x = fSet.position.at(i)(0);
+                searchPoint.y = fSet.position.at(i)(1);
+                searchPoint.z = fSet.position.at(i)(2);
+                if (kdtree.radiusSearch (searchPoint, centroid_to_wall_distance_, pointIdx, pointRadius) > 0){
+                    fSet.walls.insert(i);
+                    std::cout << "found probable wall." << std::endl;
+                } else {
+                    single_object.push_back(i);
+                }
+            }
+            new_object.push_back(single_object);
+            fSet.objectSize += single_object.size();
+        }
+        c = new_object;
     }
 
     void planeFeatures::groupObjects(featureSet &fSet){

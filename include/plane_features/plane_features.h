@@ -9,7 +9,6 @@
 
 #include <moment_of_inertia/moment_of_inertia_estimation.h>
 #include "dbscan/dbscan.h"
-#include "dbscan/rectangle.h"
 #include <Eigen/Dense>
 #include <vector>
 
@@ -61,10 +60,12 @@ public:
     void loadFeatures(const vPointCloudT &planes, const std::vector<Eigen::Vector4d> &normal, const std::vector<int> &normalInd, featureSet &fSet);
     // Nearest neighbour search using flann library
     void matchFeatures(featureSet &fSet, std::vector<std::vector<int> > &c);
+    void matchFeatures(featureSet &fSet);
     // Create clusters from nearest neighbour search and load into sets
     void groupFeatures(featureSet &fSet);
     // Detects wall segments that were wrongly classified.
     void improveWalls(const vPointCloudT &planes, featureSet &fSet);
+    void improveWalls(const vPointCloudT &planes, featureSet &fSet, std::vector<std::vector<int> > &c);
     // Find repeating objects from set of planes
     void groupObjects(featureSet &fSet);
 
