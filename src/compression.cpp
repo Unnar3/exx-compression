@@ -362,6 +362,50 @@ namespace EXX{
 	    return cloud_mesh;
 	}
 
+	void compression::improveTriangulation(std::vector<cloudMesh> &cm, vPointCloudT &planes, vPointCloudT &hulls){
+
+		int inlier_cnt = 0;
+		std::vector<int> points;
+		std::vector<int> polys;
+		int max = 0;
+		int min = 0;
+
+		for ( size_t i = 0; i < cm.size()-1; ++i ){
+			std::cout << "in loop" << std::endl;
+			inlier_cnt = planes.at(i)->points.size();
+			polys.clear();
+			std::cout << "going in for" << std::endl;
+			for ( size_t j = 0; j < cm.at(i).mesh.polygons.size(); ++j ){
+				std::cout << "inside for" << std::endl;
+				points.clear();
+				for ( size_t k = 0; k < cm[i].mesh.polygons[j].vertices.size(); ++k ){
+					std::cout << "inside inner for" << std::endl;
+					if ( cm[i].mesh.polygons[j].vertices[k] >= inlier_cnt ){
+						points.push_back(k);
+					}
+				}
+				std::cout << "going to if" << std::endl;
+				if ( points.size() > 2 ){
+					std::cout << "inside if" << std::endl;
+					max = *std::max_element(points.begin(), points.end()); 
+					min = *std::min_element(points.begin(), points.end()); 
+					if (max - min < 5){
+						polys.push_back(j);
+					}
+				}
+				std::cout << "after if" << std::endl;
+			}
+			std::cout << "going to range for" << std::endl;
+			std::sort(polys.begin(), polys.end(), std::greater<int>());
+			for ( auto j : polys ){
+				std::cout << "inside range for" << std::endl;
+				cm[i].mesh.polygons.erase(cm[i].mesh.polygons.begin() + j);
+			}
+			std::cout << "hmmm" << std::endl;
+		}
+
+	}
+
 	double compression::pointToLineDistance(PointT current, PointT next, PointT nextCheck){
 		std::vector<float> x0x1;
 		x0x1.push_back(nextCheck.x-current.x);
@@ -411,8 +455,7 @@ namespace EXX{
 	}
 
 	void compression::triangulatePlanes(){
-		// compression::voxelGridFilter();
-		// std::cout << "voxel" << std::endl;
+		// compression::voxelGridFilter()lastd::cout << "voxel" << std::endl;
 		// compression::extractPlanesRANSAC();
 		// std::cout << "ransac" << std::endl;
 		// compression::projectToPlane();

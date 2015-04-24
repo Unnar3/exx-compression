@@ -66,7 +66,7 @@ public:
 		ec_cluster_tolerance_(0.05),
 		ec_min_cluster_size_(100),
 		hull_alpha_(0.1), 
-		rw_hull_eps_(0.02),
+		rw_hull_eps_(0.04),
 		rw_hull_max_dist_(0.3), 
 		simplify_hulls_(true),
 		gp3_search_rad_(0.3), 
@@ -103,6 +103,7 @@ public:
 	// TRIANGULATION
 	void greedyProjectionTriangulation(PointCloudT::Ptr nonPlanar, vPointCloudT *planes, vPointCloudT *hulls, std::vector<cloudMesh> *cm);
 	void greedyProjectionTriangulationPlanes(PointCloudT::Ptr nonPlanar, vPointCloudT *planes, vPointCloudT *hulls, std::vector<cloudMesh> *cm);
+	void improveTriangulation(std::vector<cloudMesh> &cm, vPointCloudT &planes, vPointCloudT &hulls);
 
 	// SET METHODS
 	void setVoxelLeafSize(float leaf){ v_leaf_size_ = leaf; }
