@@ -1,4 +1,5 @@
 #include <plane_features/plane_features.h>
+#include <moment_of_inertia/moment_of_inertia_estimation.h>
 #include <exx_compression/compression.h>
 #include <pcl/common/common.h>
 #include <pcl/kdtree/kdtree_flann.h>

@@ -38,7 +38,6 @@
 */
 #ifndef PCL_MOMENT_OF_INERTIA_ESIMATION_H_
 #define PCL_MOMENT_OF_INERTIA_ESIMATION_H_
-#define PCL_NO_PRECOMPILE
 #include <vector>
 #include <math.h>
 #include <pcl/features/feature.h>
@@ -296,7 +295,5 @@ EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 }
 #define PCL_INSTANTIATE_MomentOfInertiaEstimation(T) template class pcl::MomentOfInertiaEstimation<T>;
-#ifdef PCL_NO_PRECOMPILE
 #include "moment_of_inertia_estimation.hpp"
-#endif
 #endif

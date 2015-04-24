@@ -301,6 +301,39 @@ namespace EXX{
         return cloud_out;
 	}
 
+
+	void compression::getPlaneDensity( vPointCloudT &planes, vPointCloudT &hulls,  std::vector<densityDescriptor> &dDesc){
+
+		// check if planes and hulls are same size
+		if ( planes.size() != hulls.size() ){
+			return;
+		}
+
+		// Start by finding area of the planes
+		pcl::MomentOfInertiaEstimation<PointT> feature_extractor;
+        PointT min_point_OBB;
+        PointT max_point_OBB;
+        PointT pos_OBB;
+        Eigen::Matrix3f rot_mat_OBB; 
+        densityDescriptor dens;
+
+        for (size_t i = 0; i < hulls.size(); ++i){           
+            feature_extractor.setInputCloud (hulls[i]);
+            feature_extractor.compute ();
+			feature_extractor.getOBB (min_point_OBB, max_point_OBB, pos_OBB, rot_mat_OBB);
+			dens.x = std::abs( max_point_OBB.x - min_point_OBB.x);
+			dens.y = std::abs( max_point_OBB.y - min_point_OBB.y);
+			dens.area = dens.x * dens.y;
+
+			float max_points_size = dens.area / ( v_leaf_size_ * v_leaf_size_ ); 
+			float pRatio = planes[i]->points.size() / max_points_size;
+			dens.voxel_res = std::max(std::min( dens.x, dens.y ) / 5 * pRatio, v_leaf_size_);
+			dDesc.push_back( dens );
+		}
+
+	}
+
+
 	void compression::greedyProjectionTriangulation(PointCloudT::Ptr nonPlanar, vPointCloudT *planes, vPointCloudT *hulls, std::vector<cloudMesh> *cm){
 		PointCloudT::Ptr tmp_cloud (new PointCloudT ());
 		for (size_t i = 0; i < sv_planes_.size(); i++){

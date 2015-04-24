@@ -1,6 +1,7 @@
 #ifndef COMPRESSION_H
 #define COMPRESSION_H
 
+#include <moment_of_inertia/moment_of_inertia_estimation.h>
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
 #include <pcl/ModelCoefficients.h>
@@ -25,6 +26,13 @@ struct planesAndCoeffs{
 struct cloudMesh{
 	PointCloudT::Ptr cloud;
 	pcl::PolygonMesh mesh;
+};
+
+struct densityDescriptor{
+	float area;
+	float x;
+	float y;
+	float voxel_res;
 };
 
 class compression{
@@ -99,6 +107,8 @@ public:
 	void planeToConcaveHull(vPointCloudT *planes, vPointCloudT *hulls);
 	void planeToConvexHull(vPointCloudT &planes, vPointCloudT &hulls, std::vector<double> &area);
 	void reumannWitkamLineSimplification(vPointCloudT* hulls, vPointCloudT* s_hulls);
+
+	void getPlaneDensity( vPointCloudT &planes, vPointCloudT &hulls, std::vector<densityDescriptor> &dDesc);
 
 	// TRIANGULATION
 	void greedyProjectionTriangulation(PointCloudT::Ptr nonPlanar, vPointCloudT *planes, vPointCloudT *hulls, std::vector<cloudMesh> *cm);
