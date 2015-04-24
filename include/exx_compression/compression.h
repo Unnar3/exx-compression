@@ -29,10 +29,10 @@ struct cloudMesh{
 };
 
 struct densityDescriptor{
-	float area;
-	float x;
-	float y;
 	float voxel_res;
+	float seed_res;
+	float rw_max_dist;
+	float gp3_search_rad;
 };
 
 class compression{
@@ -41,14 +41,14 @@ class compression{
 	float v_leaf_size_;
 	float sv_voxel_res_, sv_seed_res_, sv_color_imp_, sv_spatial_imp_;
 	// RANSAC
-	int max_ite_, min_inliers_, max_number_planes_; double dist_thresh_;
+	int max_ite_, min_inliers_, max_number_planes_; float dist_thresh_;
 	// EUCLIDEAN CLUSTERING
-	double ec_cluster_tolerance_; int ec_min_cluster_size_;
+	float ec_cluster_tolerance_; int ec_min_cluster_size_;
 	// CONCAVE HULLS
-	double hull_alpha_, rw_hull_eps_, rw_hull_max_dist_;
+	float hull_alpha_, rw_hull_eps_, rw_hull_max_dist_;
 	bool simplify_hulls_;
 	// GREEDY PROJECTION TRIANGULATION
-	double gp3_search_rad_, gp3_Mu_, gp3_max_surface_angle_, gp3_min_angle_, gp3_max_angle_;
+	float gp3_search_rad_, gp3_Mu_, gp3_max_surface_angle_, gp3_min_angle_, gp3_max_angle_;
 	int gp3_max_nearest_neighbours_, gp3_Ksearch_;
 
 	PointCloudT::Ptr cloud_;
@@ -70,18 +70,18 @@ public:
 		max_ite_(100), 
 		min_inliers_(200),
 		max_number_planes_(100), 
-		dist_thresh_(0.04), 
-		ec_cluster_tolerance_(0.05),
+		dist_thresh_(0.04f), 
+		ec_cluster_tolerance_(0.05f),
 		ec_min_cluster_size_(100),
-		hull_alpha_(0.1), 
-		rw_hull_eps_(0.04),
-		rw_hull_max_dist_(0.3), 
+		hull_alpha_(0.1f), 
+		rw_hull_eps_(0.04f),
+		rw_hull_max_dist_(0.3f), 
 		simplify_hulls_(true),
-		gp3_search_rad_(0.3), 
-		gp3_Mu_(3.0), 
-		gp3_max_surface_angle_(M_PI/4),
+		gp3_search_rad_(0.3f), 
+		gp3_Mu_(3.0f), 
+		gp3_max_surface_angle_(M_PI/4.0f),
 		gp3_min_angle_(M_PI/20),  
-		gp3_max_angle_(2*M_PI/2.5),
+		gp3_max_angle_(2.0f*M_PI/2.5f),
 		gp3_max_nearest_neighbours_(100), 
 		gp3_Ksearch_(20)
 	{ }
@@ -92,7 +92,7 @@ public:
 	
 	// Filtering Methods 
 	void voxelGridFilter(PointCloudT::Ptr cloud, PointCloudT::Ptr out_cloud);
-	void superVoxelClustering(vPointCloudT *cloud, vPointCloudT *out_vec);
+	void superVoxelClustering(vPointCloudT *cloud, vPointCloudT *out_vec, std::vector<densityDescriptor> &dDesc);
 
 	// RANSAC METHODS
 	void extractPlanesRANSAC(PointCloudT::Ptr cloud, planesAndCoeffs *pac);
@@ -106,13 +106,13 @@ public:
 	// CONCAVE HULLS
 	void planeToConcaveHull(vPointCloudT *planes, vPointCloudT *hulls);
 	void planeToConvexHull(vPointCloudT &planes, vPointCloudT &hulls, std::vector<double> &area);
-	void reumannWitkamLineSimplification(vPointCloudT* hulls, vPointCloudT* s_hulls);
+	void reumannWitkamLineSimplification(vPointCloudT* hulls, vPointCloudT* s_hulls, std::vector<densityDescriptor> &dDesc);
 
 	void getPlaneDensity( vPointCloudT &planes, vPointCloudT &hulls, std::vector<densityDescriptor> &dDesc);
 
 	// TRIANGULATION
 	void greedyProjectionTriangulation(PointCloudT::Ptr nonPlanar, vPointCloudT *planes, vPointCloudT *hulls, std::vector<cloudMesh> *cm);
-	void greedyProjectionTriangulationPlanes(PointCloudT::Ptr nonPlanar, vPointCloudT *planes, vPointCloudT *hulls, std::vector<cloudMesh> *cm);
+	void greedyProjectionTriangulationPlanes(PointCloudT::Ptr nonPlanar, vPointCloudT *planes, vPointCloudT *hulls, std::vector<cloudMesh> *cm,std::vector<densityDescriptor> &dDesc);
 	void improveTriangulation(std::vector<cloudMesh> &cm, vPointCloudT &planes, vPointCloudT &hulls);
 
 	// SET METHODS
@@ -156,16 +156,16 @@ public:
 	void saveRWHulls(std::string name = "cmprs_rw_hulls"){ savePCD(rw_hulls_, name); }
 private:
 
-	PointCloudT::Ptr superVoxelClustering_s(PointCloudT::Ptr cloud);
+	PointCloudT::Ptr superVoxelClustering_s(PointCloudT::Ptr cloud, densityDescriptor &dDesc);
 	double pointToLineDistance(PointT current, PointT next, PointT nextCheck);
 	double distBetweenPoints(PointT a, PointT b);
 	PointCloudT::Ptr planeToConcaveHull_s(PointCloudT::Ptr cloud);
 	void planeToConvexHull_s(const PointCloudT::Ptr cloud, PointCloudT::Ptr out, double &area);
-	PointCloudT::Ptr reumannWitkamLineSimplification_s(PointCloudT::Ptr cloud);
+	PointCloudT::Ptr reumannWitkamLineSimplification_s(PointCloudT::Ptr cloud, densityDescriptor &dDesc);
 	void savePCD(PointCloudT::Ptr cloud, std::string name);
 	void savePCD(std::vector<PointCloudT::Ptr> cloud, std::string name);
 	void saveVTK(pcl::PolygonMesh mesh, std::string name);
-	cloudMesh greedyProjectionTriangulation_s(PointCloudT::Ptr cloud);
+	cloudMesh greedyProjectionTriangulation_s(PointCloudT::Ptr cloud, float gp3_rad);
 	PointCloudT::Ptr PointRGBAtoRGB( PointCloudTA::Ptr cloudRGBA );
 
 };

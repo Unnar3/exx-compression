@@ -1,4 +1,5 @@
 #include <exx_compression/compression.h>
+#include <utils/utils.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/filters/project_inliers.h>
@@ -22,18 +23,23 @@ namespace EXX{
 		sor.filter (*out_cloud);
 	}
 
-	void compression::superVoxelClustering(vPointCloudT *cloud, vPointCloudT *out_vec){
+	void compression::superVoxelClustering(vPointCloudT *cloud, vPointCloudT *out_vec, std::vector<densityDescriptor> &dDesc){
 		std::vector<PointCloudTA::Ptr> out_cloud;
 		std::vector<PointCloudT::Ptr>::iterator it = cloud->begin();
+		int i = 0;
 		for (; it != cloud->end(); ++it)
 		{
-			(*out_vec).push_back(  compression::superVoxelClustering_s(*it) );
+			(*out_vec).push_back(  compression::superVoxelClustering_s(*it, dDesc[i++]) );
 		}
 	}
 
-	PointCloudT::Ptr compression::superVoxelClustering_s(PointCloudT::Ptr cloud){
+	PointCloudT::Ptr compression::superVoxelClustering_s(PointCloudT::Ptr cloud, densityDescriptor &dDesc){
 
-		pcl::SupervoxelClustering<PointT> super (sv_voxel_res_, sv_seed_res_, false);
+		// std::cout << "seed" << dDesc.seed_res << std::endl;
+		// std::cout << "voxel" << dDesc.voxel_res << std::endl;
+		// std::cout << "" << std::endl;
+
+		pcl::SupervoxelClustering<PointT> super (dDesc.voxel_res, dDesc.seed_res, false);
 		super.setColorImportance (sv_color_imp_);
 		super.setSpatialImportance (sv_spatial_imp_);
 		super.setNormalImportance(0.0f);
@@ -234,16 +240,17 @@ namespace EXX{
         area = chull.getTotalArea();
 	}
 
-	void compression::reumannWitkamLineSimplification(vPointCloudT* hulls, vPointCloudT* s_hulls){
+	void compression::reumannWitkamLineSimplification(vPointCloudT* hulls, vPointCloudT* s_hulls, std::vector<densityDescriptor> &dDesc){
 
 		vPointCloudT::iterator it = hulls->begin();
+		int i = 0;
 		for ( ; it < hulls->end(); ++it){
-			(*s_hulls).push_back( compression::reumannWitkamLineSimplification_s(*it) );
+			(*s_hulls).push_back( compression::reumannWitkamLineSimplification_s(*it, dDesc[++i]) );
 		}
 
 	}
 
-	PointCloudT::Ptr compression::reumannWitkamLineSimplification_s(PointCloudT::Ptr cloud){
+	PointCloudT::Ptr compression::reumannWitkamLineSimplification_s(PointCloudT::Ptr cloud, densityDescriptor &dDesc){
 	    
 	    double distToLine, distBetweenPoints;
 	    int j_current, j_next, j_nextCheck, j_last;
@@ -267,7 +274,7 @@ namespace EXX{
 
             // Check that the point is not to far away current point.
             distBetweenPoints = compression::distBetweenPoints(current, nextCheck);
-            if (distBetweenPoints > rw_hull_max_dist_){
+            if (distBetweenPoints > dDesc.rw_max_dist ){
             	inliers->indices.push_back(j_next);
             	j_current = j_nextCheck;
             	j_next = j_current + 1;
@@ -321,13 +328,24 @@ namespace EXX{
             feature_extractor.setInputCloud (hulls[i]);
             feature_extractor.compute ();
 			feature_extractor.getOBB (min_point_OBB, max_point_OBB, pos_OBB, rot_mat_OBB);
-			dens.x = std::abs( max_point_OBB.x - min_point_OBB.x);
-			dens.y = std::abs( max_point_OBB.y - min_point_OBB.y);
-			dens.area = dens.x * dens.y;
+			float x = float( std::abs( max_point_OBB.x - min_point_OBB.x) );
+			float y = float( std::abs( max_point_OBB.y - min_point_OBB.y) );
+			float area = x * y;
+			float max_points = area / ( v_leaf_size_ * v_leaf_size_ ); 
+			float pRatio = float(planes[i]->points.size()) / max_points;
+			dens.voxel_res = std::min( std::max( std::min( x, y ) / 10.0f * pRatio * pRatio, v_leaf_size_), sv_voxel_res_ );
+			dens.seed_res = std::min( 2.0f * dens.voxel_res, sv_seed_res_ );
+			dens.rw_max_dist = std::min( dens.voxel_res / 1.5f, rw_hull_max_dist_ );
 
-			float max_points_size = dens.area / ( v_leaf_size_ * v_leaf_size_ ); 
-			float pRatio = planes[i]->points.size() / max_points_size;
-			dens.voxel_res = std::max(std::min( dens.x, dens.y ) / 5 * pRatio, v_leaf_size_);
+			std::cout << "blahh " << utils::l2_norm(dens.seed_res) << std::endl;
+			dens.gp3_search_rad = std::min( 2.0f * utils::l2_norm(dens.seed_res), gp3_search_rad_ );
+			
+			std::cout << "voxel " << dens.voxel_res << std::endl;
+			std::cout << "seed " << dens.seed_res << std::endl;
+			std::cout << "rw " << dens.rw_max_dist << std::endl;
+			std::cout << "gp3 " << dens.gp3_search_rad << std::endl;
+			std::cout << "" << std::endl;
+
 			dDesc.push_back( dens );
 		}
 
@@ -341,19 +359,19 @@ namespace EXX{
 			*tmp_cloud += *hulls->at(i);
 		}
 		*tmp_cloud += *nonPlanar;
-		(*cm).push_back( compression::greedyProjectionTriangulation_s( tmp_cloud ) );
+		(*cm).push_back( compression::greedyProjectionTriangulation_s( tmp_cloud, gp3_search_rad_ ) );
 	}
 
-	void compression::greedyProjectionTriangulationPlanes(PointCloudT::Ptr nonPlanar, vPointCloudT *planes, vPointCloudT *hulls, std::vector<cloudMesh> *cm){
+	void compression::greedyProjectionTriangulationPlanes(PointCloudT::Ptr nonPlanar, vPointCloudT *planes, vPointCloudT *hulls, std::vector<cloudMesh> *cm, std::vector<densityDescriptor> &dDesc){
 		for (size_t i = 0; i < planes->size(); ++i){
 			PointCloudT::Ptr tmp_cloud (new PointCloudT ());
 			*tmp_cloud = *planes->at(i)+*hulls->at(i);
-			(*cm).push_back( compression::greedyProjectionTriangulation_s( tmp_cloud ));
+			(*cm).push_back( compression::greedyProjectionTriangulation_s( tmp_cloud, dDesc[i].gp3_search_rad ));
 		}
-		(*cm).push_back( compression::greedyProjectionTriangulation_s( nonPlanar ));
+		(*cm).push_back( compression::greedyProjectionTriangulation_s( nonPlanar, utils::l2_norm(v_leaf_size_) * 1.5f ));
 	}
 
-	cloudMesh compression::greedyProjectionTriangulation_s(PointCloudT::Ptr cloud){
+	cloudMesh compression::greedyProjectionTriangulation_s(PointCloudT::Ptr cloud, float gp3_rad){
 	    cloudMesh cloud_mesh;
 
 	    // Normal estimation*
@@ -367,7 +385,7 @@ namespace EXX{
 	    pcl::GreedyProjectionTriangulation<pcl::PointXYZRGBNormal> gp3;
 
 	    // Set the maximum distance between connected points (maximum edge length)
-	    gp3.setSearchRadius ( gp3_search_rad_ );
+	    gp3.setSearchRadius ( gp3_rad );
 
 	    // Set typical values for the parameters
 	    gp3.setMu ( gp3_Mu_ );
@@ -404,37 +422,28 @@ namespace EXX{
 		int min = 0;
 
 		for ( size_t i = 0; i < cm.size()-1; ++i ){
-			std::cout << "in loop" << std::endl;
 			inlier_cnt = planes.at(i)->points.size();
 			polys.clear();
-			std::cout << "going in for" << std::endl;
 			for ( size_t j = 0; j < cm.at(i).mesh.polygons.size(); ++j ){
-				std::cout << "inside for" << std::endl;
 				points.clear();
 				for ( size_t k = 0; k < cm[i].mesh.polygons[j].vertices.size(); ++k ){
-					std::cout << "inside inner for" << std::endl;
 					if ( cm[i].mesh.polygons[j].vertices[k] >= inlier_cnt ){
 						points.push_back(k);
 					}
 				}
-				std::cout << "going to if" << std::endl;
 				if ( points.size() > 2 ){
-					std::cout << "inside if" << std::endl;
 					max = *std::max_element(points.begin(), points.end()); 
 					min = *std::min_element(points.begin(), points.end()); 
 					if (max - min < 5){
 						polys.push_back(j);
 					}
 				}
-				std::cout << "after if" << std::endl;
 			}
 			std::cout << "going to range for" << std::endl;
 			std::sort(polys.begin(), polys.end(), std::greater<int>());
 			for ( auto j : polys ){
-				std::cout << "inside range for" << std::endl;
 				cm[i].mesh.polygons.erase(cm[i].mesh.polygons.begin() + j);
 			}
-			std::cout << "hmmm" << std::endl;
 		}
 
 	}

@@ -4,11 +4,10 @@ void EXX::dbscan::cluster( flann::Matrix<T> &features, std::set<int> walls, std:
 	if (c.size() > 0){ c.clear(); }
 
 	int nn = 10;
-	std::cout << "DBSCAN" << std::endl;
 
 	// Build flann nearest neighbour search.
 	// std::vector< std::vector<int> > indices(1);
- //    std::vector<std::vector<T> > dists(1);
+    // std::vector<std::vector<T> > dists(1);
     std::vector< std::vector<int> > indices_i(1);
     std::vector<std::vector<T> > dists_i(1);
 	flann::Index<flann::L2<T> > index(features, flann::KDTreeIndexParams(4));
@@ -16,7 +15,6 @@ void EXX::dbscan::cluster( flann::Matrix<T> &features, std::set<int> walls, std:
 	flann::Matrix<T> dists(new T[current.rows*nn], current.rows, nn);
     flann::Matrix<int> indices(new int[current.rows*nn], current.rows, nn);
     index.buildIndex();
-    std::cout << "index tilbúinn" << std::endl;
     // index.radiusSearch(features, indices, dists, radius, flann::SearchParams(128));
 
 	std::vector<bool> visited(features.rows, false);
@@ -43,9 +41,7 @@ void EXX::dbscan::cluster( flann::Matrix<T> &features, std::set<int> walls, std:
 				current[0][j] = features[i][j];
 			}
 
-			std::cout << "ad fara í radius search" << std::endl;
 			numPts = index.radiusSearch(current, indices, dists, eps, flann::SearchParams(128));
-			std::cout << "radius search ytri" << std::endl;
 			if( numPts >= minPts ){
 				
 				neighborPts.clear();
@@ -58,11 +54,8 @@ void EXX::dbscan::cluster( flann::Matrix<T> &features, std::set<int> walls, std:
 				for (size_t k = 0; k < neighborPts.size(); ++k ){
 					std::cout << "inni" << std::endl;
 					t = neighborPts.at(k);
-					std::cout << "neighbour: "<< t << std::endl;
-					std::cout << "visited size: " << visited.size() << std::endl;
 					if ( !visited.at(t) ){
 						visited.at(t) = true;
-						std::cout << "visited" << std::endl;
 						for (size_t j = 0; j < features.cols; ++j){
 							current[0][j] = features[t][j];
 						}
@@ -73,12 +66,10 @@ void EXX::dbscan::cluster( flann::Matrix<T> &features, std::set<int> walls, std:
 								neighborPts.push_back(indices[0][k]);
 							}
 						}
-						std::cout << "radius search innri" << std::endl;
 					}
 					if ( !cluster_member.at(t) ){
 						cluster_member.at(t) = true;
 						cluster.push_back(t);
-						std::cout << "cluster" << std::endl;
 					}
 				}
 			}
