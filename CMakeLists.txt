@@ -7,15 +7,19 @@ find_package(catkin REQUIRED COMPONENTS
 	roscpp
 	pcl_conversions
   	pcl_ros
+  	sensor_msgs
+  	std_msgs
+  	message_generation
 )
 
-#add_message_files(FILES
-#	distPose.msg
-#)
+add_message_files(FILES
+	planes.msg
+)
 
-#generate_messages(DEPENDENCIES
-#	std_msgs
-#)
+generate_messages(DEPENDENCIES
+	std_msgs
+	sensor_msgs
+)
 
 catkin_package(
 	DEPENDS
